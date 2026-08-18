@@ -153,6 +153,18 @@ jobs:
   secrets:
     name: secrets
     runs-on: ubuntu-latest
+
+    # ⚠ pull-requests: read IS REQUIRED, and its absence only shows up on a real PR.
+    # On a pull_request event gitleaks calls GET /repos/../pulls/N/commits to scan just the
+    # PR's range. The workflow-level `permissions: contents: read` does not cover that, so
+    # the action dies with:
+    #     403 "Resource not accessible by integration"
+    # On a push event it never makes that call — which is why this passed on every direct
+    # push to main and failed the moment the first pull request arrived.
+    permissions:
+      contents: read
+      pull-requests: read
+
     steps:
       - uses: actions/checkout@v4
         with:
