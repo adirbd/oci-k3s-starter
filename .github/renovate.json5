@@ -28,8 +28,11 @@
   // The Argo CD `Application` manifests. NOT the default path for this manager — its
   // default only matches `argocd/**`, so without this every chart pin here would be
   // invisible and the file would still look correctly configured.
+  // Both directories. kubernetes/optional holds apps that are not deployed by default —
+  // the tunnel connector, Traefik, External Secrets — and "not deployed yet" is exactly how
+  // a pin gets forgotten until someone copies a two-year-old chart into their cluster.
   argocd: {
-    managerFilePatterns: ['/kubernetes/applications/.+\\.ya?ml$/'],
+    managerFilePatterns: ['/kubernetes/(applications|optional)/.+\\.ya?ml$/'],
   },
 
   // Image tags and versions that live inside strings no manager understands: the Helm
@@ -39,7 +42,7 @@
     {
       customType: 'regex',
       managerFilePatterns: [
-        '/kubernetes/applications/.+\\.ya?ml$/',
+        '/kubernetes/(applications|optional)/.+\\.ya?ml$/',
         '/terraform/.+\\.tf$/',
       ],
       matchStrings: [

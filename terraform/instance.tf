@@ -97,6 +97,11 @@ resource "oci_core_instance" "main" {
   # and only when you are willing to gamble the capacity.
   lifecycle {
     ignore_changes = [metadata]
+
+    precondition {
+      condition     = local.image_id != null
+      error_message = "No Canonical Ubuntu 24.04 aarch64 image matched in this region. Either the image naming changed upstream, or 24.04 is not published where you are building. Fix: find one with `oci compute image list --compartment-id <ocid> --operating-system 'Canonical Ubuntu' --shape VM.Standard.A1.Flex` and pass it as image_ocid."
+    }
   }
 }
 

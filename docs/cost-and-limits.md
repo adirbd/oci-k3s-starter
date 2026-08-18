@@ -49,9 +49,20 @@ Rough steady-state on an idle 2-core / 12 GB box:
 | Argo CD | ~0.7 GB |
 | VictoriaMetrics + Grafana | ~1.2 GB |
 | Homepage | ~0.1 GB |
-| **Total** | **~3.5 GB** |
+| **Total, as installed** | **~3.5 GB** |
 
 **Which leaves roughly 8 GB for your app** — a lot, for one developer's side project.
+
+Each optional component you add comes out of that 8 GB:
+
+| | approx RAM |
+|---|---|
+| cloudflared (rung 2, ×2 replicas) | ~0.15 GB |
+| External Secrets (rung 4, 3 components) | ~0.3 GB |
+| Traefik (only without Cloudflare) | ~0.15 GB |
+
+Even with all of them you are near 4 GB, so the headline holds — but it is worth knowing
+that "the platform" grows as you climb.
 
 These are observations from a comparable box, not guarantees; measure yours with
 `kubectl top nodes`. The point is the order of magnitude: the platform costs you about a

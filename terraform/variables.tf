@@ -133,9 +133,22 @@ variable "image_ocid" {
 # ══════════════════════════════════════════════════════════════════════════════════
 
 variable "vcn_cidr" {
-  description = "CIDR for the VCN. Change it if it collides with a network you plan to VPN into — overlapping ranges are painful to fix later."
+  description = "CIDR for the VCN. MUST NOT overlap k3s's internal networks: pods use 10.42.0.0/16 and Services 10.43.0.0/16 by default. Change it if it collides with a network you plan to VPN into — overlapping ranges are painful to fix afterwards."
   type        = string
-  default     = "10.42.0.0/16"
+  default     = "10.10.0.0/16"
+
+  # ⚠ THIS GUARD EXISTS BECAUSE THE DEFAULT WAS ONCE 10.42.0.0/16 — exactly k3s's pod
+  # network. The node would have taken an address from the same range its own pods use.
+  # That does not fail cleanly: it produces intermittent, unexplainable networking, and
+  # nothing in any log says "your VCN overlaps your CNI".
+  #
+  # A string prefix check rather than real CIDR arithmetic, because Terraform has no
+  # "does A overlap B" function. It catches the two ranges that matter, which is the
+  # whole point.
+  validation {
+    condition     = !startswith(var.vcn_cidr, "10.42.") && !startswith(var.vcn_cidr, "10.43.")
+    error_message = "vcn_cidr must not use 10.42.x or 10.43.x — those are k3s's default pod and Service networks, and overlapping them breaks cluster networking in ways that are very hard to diagnose."
+  }
 }
 
 variable "ssh_allowed_cidr" {
@@ -168,7 +181,7 @@ variable "argocd_version" {
 }
 
 variable "gitops_repo_url" {
-  description = "Repo Argo CD watches. Defaults to this project's own kubernetes/ directory, so the first apply deploys a working sample with NO credentials. Point it at your own repo at rung 3."
+  description = "Repo Argo CD watches. ⚠ IT MUST BE CLONEABLE ANONYMOUSLY — Argo gets no credentials at first boot, so a PRIVATE repo here means the root Application fails and nothing deploys. Public repo: nothing to configure. Private: see docs/rung-3-your-app.md."
   type        = string
   default     = "https://github.com/adirbd/oci-k3s-starter.git"
 }

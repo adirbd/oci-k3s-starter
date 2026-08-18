@@ -8,16 +8,26 @@ anything — two sources of truth is how a cluster starts disagreeing with its o
 description.
 
 ```
-applications/
+applications/                  deployed automatically
 ├── infra-observability.yaml   VictoriaMetrics + Grafana
 ├── app-homepage.yaml          one page listing everything
 └── app-sample.yaml            podinfo — proof it works, delete when done
+
+optional/                      NOT deployed — copy into applications/ when you want them
+├── app-cloudflared.yaml       the tunnel connector          (rung 2)
+├── app-external-secrets.yaml  reads secrets from OCI Vault  (rung 4)
+└── app-traefik.yaml           ingress, only if you are NOT using Cloudflare
 ```
 
 ## Reaching them at rung 1
 
-There is no ingress controller yet (k3s ships Traefik; cloud-init disables it, because one
-you are not using is memory you cannot spend on your app). Use port-forward:
+There is no ingress controller by default (k3s ships Traefik; cloud-init disables it,
+because one you are not using is memory you cannot spend on your app). At rung 2 the
+Cloudflare Tunnel makes one unnecessary; if you are going without Cloudflare, add it back
+with `optional/app-traefik.yaml` — see
+[../docs/without-cloudflare.md](../docs/without-cloudflare.md).
+
+Meanwhile, use port-forward — or `../scripts/connect.sh`, which does all four at once:
 
 ```bash
 kubectl -n argocd    port-forward svc/argocd-server 8080:443    # https://localhost:8080
