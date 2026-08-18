@@ -38,3 +38,23 @@ ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
 # cf_account_id     = "..."
 # cf_zone_id        = "..."
 # cf_api_token      = "..."   # better: export TF_VAR_cf_api_token=... instead
+
+# ── Rung 2 in full ────────────────────────────────────────────────────────────────
+# enable_cloudflare = true
+# domain            = "example.com"
+# cf_account_id     = "..."      # Cloudflare dashboard, right-hand sidebar
+# cf_zone_id        = "..."      # same page, under the domain
+# cf_api_token      = "..."      # better: export TF_VAR_cf_api_token=...
+#                                # scopes: Zone:DNS:Edit + Account:Cloudflare Tunnel
+#                                #         (+ Account:Access:Apps if using Access)
+#
+# ⚠ WITHOUT THIS LIST YOUR HOSTNAMES ARE PUBLIC. The tunnel closes your ports; it does
+# not ask who is knocking, and Grafana ships admin/admin.
+# access_allowed_emails = ["you@example.com"]
+#
+# Override the routes only if you renamed things:
+# tunnel_routes = {
+#   home    = { service = "http://homepage.homepage.svc.cluster.local:3000" }
+#   grafana = { service = "http://vm-stack-grafana.observability.svc.cluster.local:80" }
+#   argocd  = { service = "https://argocd-server.argocd.svc.cluster.local:443", no_tls_verify = true }
+# }

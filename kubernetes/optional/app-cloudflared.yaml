@@ -1,0 +1,113 @@
+# The tunnel connector. RUNG 2 ONLY.
+#
+# ⚠ THIS FILE IS NOT DEPLOYED UNTIL YOU MOVE IT. It lives in kubernetes/optional/, which
+# the root Application does not watch. Copy it into kubernetes/applications/ when you have
+# run rung 2's `tofu apply` AND created the Secret below — in that order.
+#
+# Why not just ship it in applications/ and let it sit idle: without the Secret this pod
+# CrashLoops, so every rung-1 user would meet a broken app they never asked for. An
+# opt-in file is clearer than a disabled one.
+#
+# BEFORE MOVING IT:
+#   1. tofu apply           (with enable_cloudflare = true)
+#   2. run the `cloudflared_secret_command` output — it creates the namespace and the
+#      Secret, piping the token from Terraform to kubectl without touching disk
+#   3. cp kubernetes/optional/app-cloudflared.yaml kubernetes/applications/ && git push
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflared
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://bjw-s-labs.github.io/helm-charts/
+    chart: app-template
+    targetRevision: 5.1.0
+    helm:
+      values: |
+        controllers:
+          app:
+            replicas: 2 # see the note on rolling restarts below
+            strategy: RollingUpdate
+            containers:
+              app:
+                image:
+                  repository: docker.io/cloudflare/cloudflared
+                  # renovate: datasource=docker depName=docker.io/cloudflare/cloudflared
+                  tag: 2026.8.2
+                args:
+                  - tunnel
+                  - --no-autoupdate
+                  # --edge-ip-version 4 is not cosmetic. On a host with an IPv6 address
+                  # but no working IPv6 PATH, the connector picks v6 edges, fails, and
+                  # retries forever while looking healthy. Pinning v4 is the cheap fix.
+                  - --edge-ip-version
+                  - "4"
+                  - run
+                env:
+                  TUNNEL_TOKEN:
+                    valueFrom:
+                      secretKeyRef:
+                        name: cloudflared-token
+                        key: token
+                  # Metrics must bind 0.0.0.0, not the default localhost, or a probe from
+                  # outside the container can never reach them.
+                  TUNNEL_METRICS: 0.0.0.0:2000
+
+                probes:
+                  liveness:
+                    enabled: true
+                    custom: true
+                    spec:
+                      httpGet:
+                        path: /ready
+                        port: 2000
+                      initialDelaySeconds: 10
+                      periodSeconds: 30
+                      failureThreshold: 3
+                  readiness:
+                    enabled: true
+                    custom: true
+                    spec:
+                      httpGet:
+                        path: /ready
+                        port: 2000
+                      periodSeconds: 10
+
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 48Mi
+                  limits:
+                    memory: 128Mi
+
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 65532
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop: ["ALL"]
+
+        # TWO REPLICAS, on a single-node cluster, on purpose. Each connector opens its own
+        # connections to the edge, so during a rolling update or an image bump one keeps
+        # serving while the other restarts. With one replica, every update to the thing
+        # that carries ALL your traffic is a brief outage of everything — including the
+        # Argo UI you would use to look at it.
+        defaultPodOptions:
+          topologySpreadConstraints: []
+
+        service:
+          app:
+            enabled: false # nothing connects TO it; it dials out
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudflared
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

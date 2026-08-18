@@ -44,3 +44,41 @@ output "console_private_key" {
   value       = tls_private_key.console.private_key_openssh
   sensitive   = true
 }
+
+# ── Rung 2 outputs (null unless enable_cloudflare = true) ─────────────────────────
+
+output "urls" {
+  description = "The hostnames the tunnel serves."
+  value = var.enable_cloudflare ? [
+    for name, _ in var.tunnel_routes : "https://${name}.${var.domain}"
+  ] : []
+}
+
+output "cloudflared_secret_command" {
+  description = "Create the Kubernetes Secret the connector reads. Run this once after enabling Cloudflare; the token is piped from Terraform straight into kubectl so it never lands in a file or your shell history."
+  # Creates the namespace first: the Secret has to exist BEFORE the connector pod starts,
+  # but the namespace is normally made by Argo when the app syncs — so doing it here breaks
+  # the ordering problem without needing a Kubernetes provider in this root module.
+  value = var.enable_cloudflare ? join(" ", [
+    "kubectl create namespace cloudflared --dry-run=client -o yaml | kubectl apply -f - &&",
+    "tofu output -raw cloudflared_token |",
+    "kubectl create secret generic cloudflared-token",
+    "-n cloudflared --from-file=token=/dev/stdin",
+    "--dry-run=client -o yaml | kubectl apply -f -",
+  ]) : "(set enable_cloudflare = true first)"
+}
+
+output "cloudflared_token" {
+  description = "The connector token. Sensitive: it is the credential that lets anything join your tunnel. Read it only through the command above."
+  value       = var.enable_cloudflare ? data.cloudflare_zero_trust_tunnel_cloudflared_token.main[0].token : null
+  sensitive   = true
+}
+
+output "access_status" {
+  description = "Whether a login sits in front of these hostnames."
+  value = !var.enable_cloudflare ? "n/a — Cloudflare disabled" : (
+    length(var.access_allowed_emails) > 0
+    ? "protected by Cloudflare Access (${length(var.access_allowed_emails)} allowed address(es))"
+    : "⚠ PUBLIC — no access_allowed_emails set, so these hostnames are open to the internet"
+  )
+}

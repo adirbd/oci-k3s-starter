@@ -1,10 +1,5 @@
 # Rung 2 — real URLs instead of port-forward
 
-> ### ⚠ Not built yet
-> The variables exist (`enable_cloudflare`, `domain`, `cf_*`) but the resources behind them
-> do not. Setting `enable_cloudflare = true` today changes nothing. This page is the design,
-> kept here so the plan is reviewable — it will lose this banner when the code lands.
-
 **You need:** a domain whose nameservers point at Cloudflare. Free.
 
 **You can skip this rung entirely.** Everything from rung 1 keeps working with
@@ -15,56 +10,141 @@
 ## What it gets you
 
 `grafana.example.com` works from anywhere, with a login in front of it, **and your box
-still has no inbound ports open**.
+still has no inbound ports open.**
 
 That last part is the interesting bit. A Cloudflare Tunnel is a connector *inside* the
 cluster that dials **outbound** to Cloudflare and holds the connection open. Traffic
-arrives at Cloudflare's edge and is handed back down that existing connection. Nothing
-listens on the public internet, so there is nothing to port-scan.
+arrives at Cloudflare's edge and is handed back down that existing connection.
 
 ```
-browser → Cloudflare edge → (tunnel, outbound-established) → cloudflared pod → service
+browser → Cloudflare edge → (tunnel, outbound-established) → cloudflared pod → Service
 ```
 
-Compare with the usual approach — open 443, run an ingress controller, get a certificate,
-keep it renewed, and hope nothing else is listening. This is fewer moving parts *and* a
-smaller attack surface.
+Your security list still has exactly one inbound rule, for SSH. There is nothing else to
+port-scan.
 
-## What gets created
+Note there is **no ingress controller** in that path. The tunnel terminates the request and
+hands it straight to a Kubernetes Service, so k3s's Traefik stays disabled and you save
+both the memory and the certificate machinery.
 
-| | |
+## 1. Get three values from Cloudflare
+
+| | where |
 |---|---|
-| `cloudflare_zero_trust_tunnel_cloudflared` | the tunnel |
-| `cloudflare_zero_trust_tunnel_cloudflared_config` | hostname → service routing |
-| `cloudflare_dns_record` (one per hostname) | CNAME to `<tunnel-id>.cfargotunnel.com`, proxied |
-| a `cloudflared` Deployment | in-cluster, taking its token from a Secret |
+| **Account ID** | dashboard → right-hand sidebar |
+| **Zone ID** | same sidebar, with your domain selected |
+| **API token** | My Profile → API Tokens → Create |
 
-**`config_src = "cloudflare"` is not the provider default and matters:** it means the
-routing above is what the connector obeys. The default (`local`) means a YAML file on the
-box, which this design does not have — and changing it later replaces the tunnel and
-issues a new token.
+The token needs:
 
-## Access: the login in front
+- **Zone → DNS → Edit**
+- **Account → Cloudflare Tunnel → Edit**
+- **Account → Access: Apps and Policies → Edit** (only if you want the login)
 
-Cloudflare Access puts an identity check ahead of the tunnel, so `grafana.example.com`
-asks *who you are* before it reaches your cluster at all. Log in with Google or GitHub;
-your app never sees an unauthenticated request.
+## 2. Turn it on
 
-One wildcard application over `*.example.com` covers every hostname at once — simpler than
-per-app policies, and it cannot drift out of sync with itself.
+```hcl
+# terraform.tfvars
+enable_cloudflare = true
+domain            = "example.com"
+cf_account_id     = "..."
+cf_zone_id        = "..."
 
-> **Pin the identity provider.** If you leave One-Time-PIN enabled account-wide, anyone who
-> can receive email at an allowed address can log in. Pin the app to the specific IdP you
-> mean.
+# ⚠ Without this, your hostnames are PUBLIC.
+access_allowed_emails = ["you@example.com"]
+```
 
-## Why not just open 443?
+```bash
+export TF_VAR_cf_api_token=...    # keep it out of the file and out of state-adjacent places
+tofu apply
+```
 
-You can. You would then own: an ingress controller, cert-manager, a DNS-01 solver, a
-renewal that fails silently at 3am, and a listening port. The tunnel replaces all of it
-with an outbound connection.
+That creates the tunnel, its routing, a proxied CNAME per hostname, and — if you listed
+emails — a Cloudflare Access application in front of each one.
 
-The trade is a dependency on Cloudflare. That is real — which is precisely why this rung is
-optional and rung 1 does not need it.
+## 3. Give the connector its token
+
+```bash
+tofu output -raw cloudflared_secret_command   # then run what it prints
+```
+
+It creates the namespace and the Secret in one go, piping the token from Terraform
+straight into `kubectl`. The token never lands in a file or your shell history.
+
+## 4. Deploy the connector
+
+It ships in `kubernetes/optional/`, which Argo does **not** watch — otherwise every rung-1
+user would get a CrashLooping pod for a tunnel they never set up.
+
+```bash
+cp kubernetes/optional/app-cloudflared.yaml kubernetes/applications/
+git commit -am "enable the tunnel" && git push
+```
+
+Argo picks it up within a few minutes. Then:
+
+```bash
+kubectl -n cloudflared get pods          # two, both Running
+tofu output urls
+```
+
+---
+
+## Two things that will bite you
+
+### Homepage rejects its own hostname
+
+Homepage validates the `Host` header against an allowlist. The default in
+`app-homepage.yaml` only knows about `localhost`, so through the tunnel every request
+fails with a bare **"Host validation"** error and the page never renders — with nothing to
+say a config key is missing.
+
+Add your hostname:
+
+```yaml
+env:
+  - name: HOMEPAGE_ALLOWED_HOSTS
+    value: localhost:3000,home.example.com
+```
+
+### Argo CD and the redirect loop
+
+`argocd-server` serves HTTPS with a **self-signed** certificate and 301-redirects plain
+HTTP to HTTPS. So:
+
+- route it over HTTP → infinite redirect loop
+- route it over HTTPS → certificate verification fails
+
+`tunnel_routes` therefore sends Argo over HTTPS with `no_tls_verify = true`. The
+alternative is patching `argocd-cmd-params-cm` to set `server.insecure=true`; this repo
+prefers leaving Argo exactly as upstream ships it, since the unverified hop is pod-to-pod
+inside a single node.
+
+## What Access actually does
+
+It puts an identity check **ahead of** your cluster: `grafana.example.com` asks who you are
+before the request reaches the tunnel at all. Your app never sees an unauthenticated
+request.
+
+Three settings here came from a real outage rather than a preference:
+
+- **`session_duration = "168h"`** — when a session expires mid-use, Access redirects the
+  in-flight XHR to its login page. A browser cannot report that as "your session expired";
+  it reports a **CORS error**. Every app appears broken at once, and nothing says why.
+- **`options_preflight_bypass`** — OPTIONS preflights carry no cookies, so Access treats
+  them as unauthenticated and swallows them into the login redirect. Guaranteed CORS
+  failure on any non-simple request.
+- **`http_only_cookie_attribute`** — the session cookie should not be readable by page JS.
+
+> **Pin your identity provider.** If One-Time-PIN is enabled account-wide, anyone who can
+> receive mail at an allowed address can log in. Fine for you; think about it before adding
+> a whole domain to the allowlist.
+
+## Rolling back
+
+Set `enable_cloudflare = false` and apply — the tunnel, DNS records and Access apps are all
+removed. Delete `kubernetes/applications/app-cloudflared.yaml` and Argo prunes the
+connector. You are back at rung 1 with nothing left behind.
 
 ## Next
 

@@ -213,3 +213,40 @@ variable "cf_zone_id" {
   type        = string
   default     = null
 }
+
+variable "tunnel_routes" {
+  description = "Hostnames the tunnel serves, and the in-cluster Service each maps to. Note these point straight at Kubernetes Services — there is no ingress controller in the middle, because the tunnel already terminates the request."
+  type = map(object({
+    service       = string
+    no_tls_verify = optional(bool, false)
+  }))
+
+  default = {
+    # <name>.<your domain>. Change the keys, not the shape.
+    home = {
+      service = "http://homepage.homepage.svc.cluster.local:3000"
+    }
+    grafana = {
+      service = "http://vm-stack-grafana.observability.svc.cluster.local:80"
+    }
+    argocd = {
+      # ⚠ HTTPS, and TLS verification OFF, and this combination is deliberate.
+      # argocd-server serves HTTPS with a SELF-SIGNED certificate, so a normal HTTPS
+      # origin fails verification. Sending plain HTTP instead gives you an infinite
+      # redirect loop, because the server 301s http→https unless it is started with
+      # `--insecure`.
+      #
+      # Two ways out: patch argocd-cmd-params-cm to set server.insecure=true, or accept
+      # its self-signed cert here. This repo does the latter — it keeps Argo exactly as
+      # upstream ships it, and the "unverified" hop is pod-to-pod inside one node.
+      service       = "https://argocd-server.argocd.svc.cluster.local:443"
+      no_tls_verify = true
+    }
+  }
+}
+
+variable "access_allowed_emails" {
+  description = "Email addresses allowed through Cloudflare Access. Empty means NO Access app is created and your hostnames are served to the whole internet — fine for a public site, wrong for Grafana."
+  type        = list(string)
+  default     = []
+}

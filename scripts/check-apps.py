@@ -21,7 +21,7 @@ subchart values (Grafana's, here) never appear in the parent's values.yaml at al
 findings, 17 of them false. Asserting on the rendered output is slower to write and
 actually true.
 
-Usage:  scripts/check-apps.py [dir]      (defaults to kubernetes/applications)
+Usage:  scripts/check-apps.py [dirs...]  (defaults to kubernetes/applications + optional)
 """
 import subprocess
 import sys
@@ -93,10 +93,13 @@ ASSERTIONS = {
 
 
 def main() -> int:
-    target = sys.argv[1] if len(sys.argv) > 1 else "kubernetes/applications"
+    # Both directories: kubernetes/optional holds apps that are not deployed by default
+    # (the tunnel connector), and "not deployed yet" is no reason to ship it unrendered.
+    targets = sys.argv[1:] or ["kubernetes/applications", "kubernetes/optional"]
     failures = 0
 
-    for path in sorted(glob.glob(f"{target}/*.yaml")):
+    paths = [p for t in targets for p in sorted(glob.glob(f"{t}/*.yaml"))]
+    for path in paths:
         app = yaml.safe_load(open(path, encoding="utf-8"))
         if app.get("kind") != "Application":
             continue
