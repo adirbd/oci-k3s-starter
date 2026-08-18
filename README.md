@@ -129,6 +129,7 @@ instance principal — so there is no API key on the server to steal or rotate.
 - An **Oracle Cloud account** — the Always Free tier, no card charged
 - **[OpenTofu](https://opentofu.org)** (or Terraform)
 - The **[OCI CLI](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm)**, for the browser login
+- **kubectl**, to talk to the cluster once it exists
 
 **Recommended, not required**
 

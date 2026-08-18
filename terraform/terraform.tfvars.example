@@ -21,6 +21,12 @@ ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
 # Windows, if you have not made a key yet:  ssh-keygen -t ed25519
 # it lands in C:\Users\<you>\.ssh\id_ed25519.pub
 
+# The profile `oci session authenticate` created. It PROMPTS you for a name, and whatever
+# you typed goes here. Only leave this out if you accepted the literal name DEFAULT —
+# getting it wrong gives an authentication error at apply time that does not mention
+# profiles, so it is worth setting explicitly.
+oci_config_profile = "DEFAULT"
+
 # ── Optional: everything below has a sensible default ─────────────────────────────
 
 # instance_name  = "k3s-01"
