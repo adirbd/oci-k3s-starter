@@ -1,0 +1,122 @@
+# Everything here has caught a real bug in this repo, or guards one that was caught.
+# A check that has never failed is a check nobody trusts — so each job says what it is for.
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.10.0"
+
+      - name: fmt
+        run: tofu -chdir=terraform fmt -check -diff
+
+      # -backend=false: no credentials, no state, no network beyond the provider registry.
+      - name: init (no backend)
+        run: tofu -chdir=terraform init -backend=false -input=false
+
+      - name: validate
+        run: tofu -chdir=terraform validate
+
+      # cloud-init is a TEMPLATE, so `validate` never looks inside it. A `${...}` that
+      # Terraform cannot resolve, or YAML that cloud-init cannot parse, fails at apply —
+      # by which time you are debugging a box that booted and did nothing.
+      - name: cloud-init renders and parses
+        run: |
+          mkdir -p /tmp/render && cp terraform/cloud-init.yaml /tmp/render/
+          cat > /tmp/render/main.tf <<'EOF'
+          output "rendered" {
+            value = templatefile("${path.module}/cloud-init.yaml", {
+              k3s_channel      = "stable"
+              argocd_version   = "v3.2.0"
+              gitops_repo_url  = "https://example.com/repo.git"
+              gitops_repo_path = "kubernetes/applications"
+            })
+          }
+          EOF
+          tofu -chdir=/tmp/render init -backend=false -input=false >/dev/null
+          tofu -chdir=/tmp/render apply -auto-approve >/dev/null
+          tofu -chdir=/tmp/render output -raw rendered > /tmp/cloud-init.rendered
+
+          python3 - <<'PY'
+          import re, sys, yaml
+          text = open("/tmp/cloud-init.rendered").read()
+          left = re.findall(r"\$\{[^}]*\}", text)
+          if left:
+              sys.exit(f"unsubstituted placeholders survived: {left}")
+          doc = yaml.safe_load(text)
+          print("rendered cloud-init OK:",
+                len(doc["write_files"]), "write_files,",
+                len(doc["runcmd"]), "runcmd entries")
+          PY
+
+      # The bootstrap runs unattended on a box you cannot watch. A syntax error there is a
+      # server that boots, accepts SSH, and is simply empty.
+      - name: bootstrap script is valid bash
+        run: |
+          python3 - <<'PY'
+          import yaml
+          d = yaml.safe_load(open("/tmp/cloud-init.rendered"))
+          for f in d["write_files"]:
+              if f["path"].endswith(".sh"):
+                  open("/tmp/bootstrap.sh", "w").write(f["content"])
+          PY
+          bash -n /tmp/bootstrap.sh
+          echo "bootstrap script parses"
+
+  kubernetes:
+    name: kubernetes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: "v3.16.3"
+
+      - run: pip install --quiet pyyaml
+
+      # PyYAML keeps the LAST of a duplicated key, so a file with two `resources:` blocks
+      # deploys happily and ignores half of what you wrote. Nothing else catches it —
+      # least of all inside the embedded Helm values string.
+      - name: no duplicate YAML keys
+        run: python3 scripts/check-dup-keys.py
+
+      # THE ONE THAT EARNED ITS PLACE. A values file is a request; only the rendered chart
+      # says what happened. This caught two silent bugs on the day it was written —
+      # dashboard keys that did not exist, and pruning that pruned nothing.
+      - name: applications render, and say what they should
+        run: python3 scripts/check-apps.py
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: relative links resolve
+        run: python3 scripts/check-links.py
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans HISTORY; a shallow clone checks almost nothing
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
