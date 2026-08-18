@@ -1,0 +1,55 @@
+# The proof that it works — and the reason rung 1 needs no credentials at all.
+#
+# podinfo is a tiny Go web app whose whole purpose is being deployed: it renders a page
+# showing its version, the node it landed on and its runtime, so "is my cluster actually
+# working" has a visual answer instead of a kubectl incantation.
+#
+# It is here so your FIRST apply ends with something running. Chasing a GitHub App token
+# before you have ever seen the cluster serve a page is how people give up on Kubernetes.
+#
+# DELETE THIS FILE once your own app is deployed. Argo has prune enabled, so removing the
+# file removes the app — that is the whole model, and this is a safe thing to practise on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://stefanprodan.github.io/podinfo
+    chart: podinfo
+    targetRevision: 6.9.2
+    helm:
+      values: |
+        replicaCount: 1
+
+        # Small enough to be invisible on the budget in docs/cost-and-limits.md.
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+
+        # NO ingress. At rung 1 there is no ingress controller — k3s ships Traefik and
+        # cloud-init disables it, because an ingress controller you are not using is
+        # memory you cannot spend on your app. Reach this with:
+        #   kubectl -n sample port-forward svc/sample-podinfo 9898:9898
+        # then http://localhost:9898
+        ingress:
+          enabled: false
+
+        serviceMonitor:
+          enabled: false # VMServiceScrape is a different CRD; see infra-observability
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sample
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

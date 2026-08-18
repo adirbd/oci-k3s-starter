@@ -1,0 +1,173 @@
+# Monitoring: VictoriaMetrics for storage and scraping, Grafana for looking at it.
+#
+# WHY VICTORIAMETRICS RATHER THAN PROMETHEUS: on a box this size, memory is the budget.
+# VictoriaMetrics uses substantially less of it for the same series, and the k8s-stack
+# chart is a drop-in shape — the same CRDs, the same Grafana, the same dashboards.
+#
+# ⚠ THIS CHART SHIPS 41 DASHBOARDS AND 250-ODD ALERT RULES BY DEFAULT, and most of them are
+# actively wrong here. Roughly half describe control-plane components that k3s COMPILES
+# INTO A SINGLE BINARY — there is no separate etcd, scheduler, controller-manager or
+# kube-proxy to scrape, so their panels are permanently empty and their *Down alerts fire
+# forever. Shipping that is not "more monitoring": it teaches you on day one that
+# dashboards are noise and alerts are ignorable, which is the opposite of the point.
+#
+# So the defaults below are pruned hard and deliberately. Turn things back on when you have
+# a question they answer.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Short on purpose. The chart builds resource names as <release>-<chart>-<component>, and
+  # Kubernetes caps Service names and pod volume names at 63 characters. A long release
+  # name here produces a stack that installs and then fails at runtime with errors that
+  # never mention the length.
+  name: vm-stack
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    chart: victoria-metrics-k8s-stack
+    targetRevision: 0.90.2
+    helm:
+      values: |
+        # ── storage ──────────────────────────────────────────────────────────────
+        vmsingle:
+          spec:
+            retentionPeriod: "14d" # ~2 weeks is plenty for one box; it costs disk
+            storage:
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 8Gi
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                memory: 1Gi
+
+        vmagent:
+          spec:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                memory: 256Mi
+
+        # ── k3s embeds these; there is nothing to scrape ─────────────────────────
+        # Leave them enabled and you get four dashboards of empty panels plus alerts
+        # that fire permanently because the "component" they look for does not exist.
+        kubeEtcd:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeProxy:
+          enabled: false
+
+        # ── alerting: OFF until you say where it goes ────────────────────────────
+        # An Alertmanager with no receiver is a service that consumes memory to drop
+        # messages silently. Worse, it teaches you that alerts do not arrive. Turn this
+        # on together with a real destination, not before.
+        alertmanager:
+          enabled: false
+        vmalert:
+          enabled: false
+        defaultRules:
+          create: false
+
+        # ── Grafana ──────────────────────────────────────────────────────────────
+        grafana:
+          enabled: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+
+          # No persistence, on purpose. Every dashboard here arrives from this chart or
+          # from a ConfigMap in Git, so there is nothing worth keeping across a restart —
+          # and a Grafana whose state lives only in its own volume is a Grafana you cannot
+          # rebuild. Anything you draw by hand and want to keep, export to Git.
+          persistence:
+            enabled: false
+
+          # ⚠ CHANGE THIS, or put Cloudflare Access in front of it at rung 2.
+          # It is admin/admin until you do.
+          adminPassword: admin
+
+          sidecar:
+            dashboards:
+              enabled: true # picks up ConfigMaps labelled grafana_dashboard: "1"
+
+        # A curated few, rather than everything the chart ships.
+        #
+        # ⚠ THERE IS NO "DISABLE ALL, THEN ENABLE THESE" SWITCH. Every dashboard the chart
+        # knows about is ON unless individually turned off, so the list below is mostly
+        # `false`. Setting a few to `true` prunes NOTHING — verified by rendering the chart
+        # and reading the sync job's config, which is the only place the final answer
+        # appears.
+        #
+        # ⚠ AND THE KEYS MUST MATCH THE CHART EXACTLY. An unknown key is not an error: Helm
+        # accepts it and ignores it, so you get a dashboard you believe is configured and
+        # which simply is not. Check `helm show values` before adding one.
+        #
+        # NOTE these are not rendered by Helm at all — a sync Job fetches them from GitHub
+        # at install time. So they appear a minute or two AFTER the app goes Healthy, and
+        # they need working egress. An empty Grafana right after install is usually this.
+        defaultDashboards:
+          enabled: true
+          dashboards:
+            # ── kept ──────────────────────────────────────────────────────────────
+            node-exporter-full:
+              enabled: true # the box: CPU, memory, disk, network
+            victoriametrics-single-node:
+              enabled: true # is the monitoring itself healthy
+            victoriametrics-vmagent:
+              enabled: true # is anything actually being scraped
+
+            # ── k3s embeds these; the panels would be permanently empty ───────────
+            controller-manager:
+              enabled: false
+            scheduler:
+              enabled: false
+            proxy:
+              enabled: false
+
+            # ── components this install does not run ──────────────────────────────
+            alertmanager-overview:
+              enabled: false # alerting is off, see above
+            victoriametrics-vmalert:
+              enabled: false # ditto
+            victoriametrics-cluster:
+              enabled: false # single-node, not cluster mode
+            victoriametrics-operator:
+              enabled: false
+            victorialogs-single-node:
+              enabled: false # no VictoriaLogs here
+            victorialogs-cluster:
+              enabled: false
+            victorialogs-vlagent:
+              enabled: false
+            victoriatraces-single-node:
+              enabled: false # no VictoriaTraces here
+            victoriatraces-cluster:
+              enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The CRDs in this chart exceed the annotation size limit that client-side apply
+      # uses to store its "last applied configuration". Without server-side apply the
+      # sync fails with `metadata.annotations: Too long`, which reads like a chart bug.
+      - ServerSideApply=true

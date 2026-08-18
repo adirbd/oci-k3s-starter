@@ -1,0 +1,116 @@
+# One page that lists everything, so you do not have to remember port-forward incantations.
+#
+# Deliberately sparse. A dashboard whose links are half-wrong is worse than no dashboard,
+# and every entry here has to keep working for someone who has NOT done rung 2 — so the
+# links are relative to what exists at rung 1 and there are no status widgets pinging
+# services that may not be reachable yet.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homepage
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://jameswynn.github.io/helm-charts
+    chart: homepage
+    targetRevision: 2.1.0
+    helm:
+      values: |
+        image:
+          repository: ghcr.io/gethomepage/homepage
+          tag: v2.0.0
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+
+        # ⚠ REQUIRED since Homepage 1.x. Without this allowlist EVERY request fails with a
+        # bare "Host validation" error and the page never renders — with no hint that a
+        # config key is missing. Add your own hostname here at rung 2.
+        env:
+          - name: HOMEPAGE_ALLOWED_HOSTS
+            value: localhost:3000,homepage.local
+
+        serviceAccount:
+          create: true
+
+        # Read-only ClusterRole so the Kubernetes widget can count pods and nodes.
+        # get/list/watch only — no write verbs anywhere.
+        enableRbac: true
+
+        # No ingress at rung 1 — there is no ingress controller. Reach it with:
+        #   kubectl -n homepage port-forward svc/homepage 3000:3000
+        ingress:
+          main:
+            enabled: false
+
+        config:
+          kubernetes:
+            mode: cluster
+
+          settings:
+            title: My Cluster
+            theme: dark
+            color: slate
+            headerStyle: clean
+            hideVersion: true
+
+            # ⚠ A LIST, NOT A MAP — and this is not a style preference.
+            # Helm's toYaml SORTS MAP KEYS ALPHABETICALLY, so writing this as a map means
+            # your groups render in alphabetical order regardless of what the file says,
+            # and the file quietly stops describing the page. Homepage accepts both
+            # shapes; only the list survives Helm. Do not "tidy" this into a map.
+            layout:
+              - Cluster:
+                  style: row
+                  columns: 2
+              - Your apps:
+                  style: row
+                  columns: 2
+
+          services:
+            - Cluster:
+                - Argo CD:
+                    description: deploys — what Git says should be running
+                    icon: argo-cd
+                    href: https://localhost:8080
+                - Grafana:
+                    description: metrics — the box, the cluster, your app
+                    icon: grafana
+                    href: http://localhost:3001
+
+            - Your apps:
+                # podinfo, from app-sample.yaml. Delete this entry when you delete that.
+                - Sample (podinfo):
+                    description: proof the cluster works — delete me
+                    icon: kubernetes
+                    href: http://localhost:9898
+
+          widgets:
+            - kubernetes:
+                cluster:
+                  show: true
+                  cpu: true
+                  memory: true
+                  showLabel: true
+                  label: cluster
+                nodes:
+                  show: false # one node; the cluster row already says it
+            - search:
+                provider: duckduckgo
+                target: _blank
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homepage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
