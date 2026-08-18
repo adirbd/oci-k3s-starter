@@ -110,7 +110,21 @@ write_files:
       if ! kubectl get namespace argocd >/dev/null 2>&1; then
         log "installing Argo CD ${argocd_version}"
         kubectl create namespace argocd
-        kubectl -n argocd apply -f \
+        # ⚠ --server-side IS REQUIRED, and without it rung 1 silently produces nothing.
+        #
+        # Plain `kubectl apply` stores the whole object in a last-applied-configuration
+        # ANNOTATION, and annotations cap at 262144 bytes. Two of Argo's CRDs are far
+        # past that — applications.argoproj.io is ~406 KB and applicationsets.argoproj.io
+        # ~1.39 MB — so the apply fails with:
+        #     metadata.annotations: Too long: must have at most 262144 bytes
+        # `set -e` then aborts the whole bootstrap, the timer retries every 15 minutes,
+        # and it fails identically every time. You end up with a healthy box, a reachable
+        # cluster, and no Argo CD at all.
+        #
+        # Server-side apply keeps ownership in managedFields instead of an annotation, so
+        # size is a non-issue. (--force-conflicts is not needed here: the same field
+        # manager re-applying its own objects does not conflict with itself.)
+        kubectl -n argocd apply --server-side -f \
           "https://raw.githubusercontent.com/argoproj/argo-cd/${argocd_version}/manifests/install.yaml"
       else
         log "argocd namespace already present"

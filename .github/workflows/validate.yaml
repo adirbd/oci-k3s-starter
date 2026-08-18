@@ -66,6 +66,12 @@ jobs:
 
       # The bootstrap runs unattended on a box you cannot watch. A syntax error there is a
       # server that boots, accepts SSH, and is simply empty.
+      # Nothing else in CI runs kubectl, so the one thing that can kill rung 1 outright —
+      # an Argo CD manifest too large for a client-side apply — is otherwise invisible
+      # until someone boots a real machine.
+      - name: argo cd manifest can actually be applied
+        run: python3 scripts/check-argocd-manifest.py
+
       - name: bootstrap script is valid bash
         run: |
           python3 - <<'PY'
