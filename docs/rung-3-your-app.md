@@ -1,12 +1,74 @@
 # Rung 3 — deploy your own app
 
-> ### Status: works today for public repos
-> `gitops_repo_url` is wired, so pointing Argo at a **public** repo works now. The
-> **private**-repo credential wiring described below is designed but not yet implemented.
+> ### Status
+> The path described here — build to ghcr.io, point Argo at a **public** repo — works
+> today. Argo's **private**-repo credentials are configured by hand (the Secret below);
+> there is no Terraform for that yet.
 
-**You need:** a Git repo with your Kubernetes manifests.
+**You need:** your app's source, and about ten minutes.
 
 ---
+
+## First: you need an image, not source
+
+Kubernetes runs **container images**. It cannot build your code — so somewhere between
+`git push` and a running pod, something has to produce an image and put it in a registry.
+
+That is one extra step, and it can be automatic. **The shortest path that stays free:**
+
+```
+your code ──push──> GitHub Actions ──builds──> ghcr.io ──Argo/k8s pulls──> running
+```
+
+Copy [`examples/build-and-push.yaml`](../examples/build-and-push.yaml) into
+`.github/workflows/` **in your app's repo**. It builds your Dockerfile and pushes to GitHub
+Container Registry on every push to `main`. There is no registry account to create and no
+credential to manage — `GITHUB_TOKEN` is issued to the workflow automatically.
+
+### ⚠ Build for ARM, or nothing will run
+
+Oracle's free tier is **Ampere — ARM, aarch64**. A normal `docker build` on an Intel or
+Apple-Silicon-emulating-x86 setup, or on a standard GitHub runner, produces an **amd64**
+image. Kubernetes will happily pull it, start it, and fail with:
+
+```
+exec /app: exec format error
+```
+
+That message says nothing about architecture, and it is the single most common way a first
+deploy fails here. The supplied workflow sets `platforms: linux/arm64`, which is the whole
+fix.
+
+> If your app repo is **public**, GitHub's native ARM runners (`runs-on: ubuntu-24.04-arm`)
+> are free and much faster than emulation. For a **private** repo they are a paid plan, so
+> the workflow uses QEMU emulation, which is free everywhere and takes a few minutes.
+
+### Public or private image?
+
+**Start public.** A public image needs no pull secret, and your *code* can stay private
+while the built image is public — they are separate settings on GitHub.
+
+If the image must be private, the cluster needs credentials to pull it:
+
+```bash
+kubectl create secret docker-registry ghcr \
+  --docker-server=ghcr.io \
+  --docker-username=YOUR_GITHUB_USER \
+  --docker-password=YOUR_PAT \
+  -n my-app
+```
+
+…and `imagePullSecrets: [{name: ghcr}]` in the pod spec. That PAT is exactly the kind of
+credential [rung 4](rung-4-secrets.md) exists to keep off your disk.
+
+### No Dockerfile yet?
+
+Any base image works, as long as it is multi-arch — `node`, `python`, `golang`,
+`eclipse-temurin` and most official images all publish arm64. Check with:
+
+```bash
+docker manifest inspect node:22-alpine | grep -A2 arm64
+```
 
 ## The model
 
@@ -80,6 +142,17 @@ stringData:
 > That key is a real credential. Committing this file to the repo Argo is reading would be
 > a closed loop of the wrong kind — see [rung 4](rung-4-secrets.md) for where it should
 > actually live.
+
+## A worked example
+
+[`examples/my-app.yaml`](../examples/my-app.yaml) is a complete one — Application,
+Deployment and Service — with the two things people leave out and regret: a **memory
+limit** (one runaway process on a 12 GB box takes down Grafana and Argo with it) and
+**probes**, without which Kubernetes cannot tell "started" from "working".
+
+It also pins an image by **SHA rather than `latest`**. Kubernetes cannot tell that a moving
+tag changed, so pushing a new `latest` leaves the old pod running and you conclude the
+deploy is broken. The build workflow tags every image with its commit SHA for exactly this.
 
 ## A minimal Application
 

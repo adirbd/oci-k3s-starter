@@ -93,8 +93,10 @@ jobs:
       # PyYAML keeps the LAST of a duplicated key, so a file with two `resources:` blocks
       # deploys happily and ignores half of what you wrote. Nothing else catches it —
       # least of all inside the embedded Helm values string.
+      # examples/ and .github/ too: a template someone copies is code, and shipping a
+      # broken one costs the reader more than a broken file in our own tree would.
       - name: no duplicate YAML keys
-        run: python3 scripts/check-dup-keys.py
+        run: python3 scripts/check-dup-keys.py kubernetes examples .github
 
       # THE ONE THAT EARNED ITS PLACE. A values file is a request; only the rendered chart
       # says what happened. This caught two silent bugs on the day it was written —

@@ -1,0 +1,73 @@
+# Copy this to .github/workflows/ IN YOUR APP'S REPO (not this one).
+#
+# It builds your Dockerfile and pushes to GitHub Container Registry on every push to main.
+# No registry account to create, no credentials to manage: GITHUB_TOKEN is issued to the
+# workflow automatically.
+#
+# ⚠ THE ARCHITECTURE LINE IS THE ONE THAT MATTERS. Oracle's free tier is Ampere — ARM,
+# aarch64. A normal `docker build` on an Intel/AMD laptop or a standard GitHub runner
+# produces an amd64 image, and Kubernetes will pull it, start it, and fail with:
+#
+#     exec /app: exec format error
+#
+# which says nothing about architecture and sends people hunting through their Dockerfile.
+# Building for linux/arm64 is the whole fix.
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # lets GITHUB_TOKEN push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU emulates ARM on an x86 runner. Slower than native — a few minutes for a small
+      # app — but it works on the free runners every repo has.
+      #
+      # FASTER ALTERNATIVE: GitHub offers native ARM runners (`runs-on: ubuntu-24.04-arm`),
+      # free for PUBLIC repositories. If your app repo is public, use that and delete this
+      # step; if it is private, native ARM runners are a paid plan and QEMU is the free path.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          # Tag with the commit SHA as well as `latest`. Deploy the SHA, not `latest`:
+          # Kubernetes cannot tell that a moving tag changed, so `latest` gives you a
+          # deployment that does not redeploy.
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

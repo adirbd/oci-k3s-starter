@@ -1,0 +1,80 @@
+# A complete example of YOUR app. Copy into kubernetes/applications/ in the repo Argo
+# watches, change the image and the port, push.
+#
+# This is a plain-manifest Application: no Helm chart, no templating, just Kubernetes
+# objects in a directory. For one app that is simpler than a chart, and simpler is what you
+# want until it stops being enough.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOU/YOUR-APP.git # ← your app repo
+    targetRevision: HEAD
+    path: deploy # ← the directory holding the yaml below
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: my-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# ── everything below goes in YOUR app repo, under deploy/ ─────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: my-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: my-app }
+  template:
+    metadata:
+      labels: { app: my-app }
+    spec:
+      containers:
+        - name: app
+          # ⚠ PIN THE SHA, NOT `latest`. Kubernetes cannot tell that a moving tag changed,
+          # so pushing a new `latest` leaves the old pod running and you conclude the
+          # deploy is broken. The build workflow tags every image with its commit SHA
+          # precisely so you have something immutable to point at.
+          image: ghcr.io/YOU/YOUR-APP:sha-abc123
+          ports:
+            - containerPort: 8080
+
+          # Always set these. Without a memory limit one runaway process can take the node
+          # down, and on a 12 GB box that is the whole cluster — Grafana, Argo and all.
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+
+          # Kubernetes cannot tell "started" from "working" without being told.
+          readinessProbe:
+            httpGet: { path: /, port: 8080 }
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 8080 }
+            initialDelaySeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: my-app
+spec:
+  selector: { app: my-app }
+  ports:
+    - port: 80
+      targetPort: 8080

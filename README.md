@@ -99,11 +99,14 @@ Skip this rung entirely if you do not own a domain. Everything above keeps worki
 → [docs/rung-2-real-urls.md](docs/rung-2-real-urls.md)
 
 ### Rung 3 — deploy *your* app
-*Needs: a Git repo with your manifests.*
+*Needs: your source, and a Dockerfile.*
 
-Point Argo CD at your own repository. Public repo: nothing to configure. Private repo:
-this is where a **GitHub App** or a personal access token comes in, and the doc explains
-which to pick and why.
+Kubernetes runs images, not source — so a build step has to exist somewhere. There is a
+ready-to-copy GitHub Actions workflow that builds yours and pushes it to ghcr.io free, and
+then Argo deploys it on every push.
+
+⚠ **Build for `linux/arm64`.** The free tier is Ampere, and an amd64 image fails with
+`exec format error` — a message that says nothing about architecture and eats an evening.
 
 → [docs/rung-3-your-app.md](docs/rung-3-your-app.md)
 
