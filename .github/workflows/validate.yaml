@@ -16,9 +16,9 @@ jobs:
     name: terraform
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: "1.10.0"
 
@@ -82,11 +82,11 @@ jobs:
     name: kubernetes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
-          version: "v3.16.3"
+          version: "v4.2.4"
 
       - run: pip install --quiet pyyaml
 
@@ -108,7 +108,7 @@ jobs:
     name: scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: bash scripts parse
         run: for f in scripts/*.sh; do bash -n "$f" && echo "OK $f"; done
@@ -131,7 +131,7 @@ jobs:
     name: docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: relative links resolve
         run: python3 scripts/check-links.py
 
@@ -139,7 +139,7 @@ jobs:
     name: renovate config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Caught a real error the day it was added: JSON5 has no string concatenation, so a
       # description written as 'a' + 'b' is a parse failure — and an unparseable config is
       # a Renovate that opens nothing, silently.
@@ -166,9 +166,9 @@ jobs:
       pull-requests: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # gitleaks scans HISTORY; a shallow clone checks almost nothing
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
