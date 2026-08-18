@@ -14,8 +14,12 @@ compartment_ocid = "ocid1.tenancy.oc1..aaaa_REPLACE_ME"
 
 # CONTENT, not a path. This is your only way in until you set up something better.
 ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
-# ...or read it from disk instead:
-# ssh_public_key = file("~/.ssh/id_ed25519.pub")
+# ...or read it from disk. pathexpand() rather than a bare "~/..." — on Windows there is
+# no ~ convention, and pathexpand resolves the user's home on every platform:
+# ssh_public_key = file(pathexpand("~/.ssh/id_ed25519.pub"))
+#
+# Windows, if you have not made a key yet:  ssh-keygen -t ed25519
+# it lands in C:\Users\<you>\.ssh\id_ed25519.pub
 
 # ── Optional: everything below has a sensible default ─────────────────────────────
 

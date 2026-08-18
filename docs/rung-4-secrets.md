@@ -24,10 +24,20 @@ with a public IP, that is the thing you least want to have.
 knows which VM is asking. No key, no token, no file. Nothing to rotate, and nothing to
 steal from the disk.
 
-```
-instance ──"I am ocid1.instance..."──→ OCI IAM
-   │                                     │  dynamic group + policy say yes
-   └────────── secret value ←────────────┘
+```mermaid
+sequenceDiagram
+    participant P as ESO pod
+    participant M as instance metadata
+    participant I as OCI IAM
+    participant V as Vault
+    P->>M: who am I?
+    M-->>P: signed identity of THIS instance
+    P->>I: may I read secret "db-password"?
+    Note over I: dynamic group names this instance<br/>policy grants read on the compartment
+    I-->>P: yes
+    P->>V: fetch it
+    V-->>P: value
+    Note over P: written as a normal k8s Secret.<br/>No credential was ever on disk.
 ```
 
 Take the disk and you get nothing: the credential was never on it.

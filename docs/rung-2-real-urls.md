@@ -16,9 +16,19 @@ That last part is the interesting bit. A Cloudflare Tunnel is a connector *insid
 cluster that dials **outbound** to Cloudflare and holds the connection open. Traffic
 arrives at Cloudflare's edge and is handed back down that existing connection.
 
+```mermaid
+flowchart LR
+    B["browser"] --> CF["Cloudflare edge<br/>TLS + Access login"]
+    CF -. "back down a connection<br/>the cluster opened" .-> CFD
+    subgraph BOX["your box · no inbound ports"]
+        CFD["cloudflared pod"] --> S["Service<br/>Grafana, Argo, Homepage"]
+    end
+    CFD -- "dials OUT" --> CF
+    style BOX fill:#f6f8fa,stroke:#2ea043
 ```
-browser → Cloudflare edge → (tunnel, outbound-established) → cloudflared pod → Service
-```
+
+The connector dials **out** and holds the connection open. Requests arrive at Cloudflare
+and come back down it — so nothing is listening on the public internet.
 
 Your security list still has exactly one inbound rule, for SSH. There is nothing else to
 port-scan.
@@ -55,7 +65,11 @@ access_allowed_emails = ["you@example.com"]
 ```
 
 ```bash
-export TF_VAR_cf_api_token=...    # keep it out of the file and out of state-adjacent places
+export TF_VAR_cf_api_token=...    # keep it out of the file
+tofu apply
+```
+```powershell
+$env:TF_VAR_cf_api_token = "..."
 tofu apply
 ```
 

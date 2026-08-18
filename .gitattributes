@@ -1,0 +1,16 @@
+# ⚠ THE LINE-ENDING RULE IS LOAD-BEARING ON WINDOWS.
+#
+# Git on Windows defaults to core.autocrlf=true, which rewrites files to CRLF on checkout.
+# cloud-init.yaml embeds a bash script, so a CRLF checkout produces a bootstrap that fails
+# on the server with errors like:
+#     /usr/local/sbin/k3s-starter-bootstrap.sh: line 2: $'\r': command not found
+# The box boots, accepts SSH, and is empty — and nothing points at the line endings.
+#
+# Forcing LF means a Windows contributor gets the same bytes as everyone else, and the
+# server gets a script that runs.
+* text=auto eol=lf
+
+# Never touched by newline normalisation.
+*.png binary
+*.jpg binary
+*.ico binary

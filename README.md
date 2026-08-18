@@ -14,11 +14,36 @@ oci session authenticate          # browser login, no keys on disk
 cd terraform
 cp terraform.tfvars.example terraform.tfvars   # fill in 3 values
 tofu init && tofu apply
+
+cd .. && ./scripts/connect.sh     # opens every dashboard  (connect.ps1 on Windows)
 ```
+
+**Works on macOS, Linux and Windows.** Every command that differs between them is given in
+both forms; Windows needs PowerShell, not WSL, though WSL is fine if you have it.
 
 ---
 
 ## What you get
+
+```mermaid
+flowchart LR
+    You["you<br/>laptop"] -- "git push" --> GH["GitHub<br/>your repo"]
+    You -- "tofu apply<br/>once" --> OCI
+
+    subgraph OCI["Oracle Cloud · free ARM box"]
+        direction TB
+        K3S["k3s<br/>Kubernetes, one binary"]
+        Argo["Argo CD"] --> App["your app"]
+        Argo --> Graf["Grafana"]
+        Argo --> Home["Homepage"]
+    end
+
+    GH -- "Argo watches" --> Argo
+
+    style OCI fill:#f6f8fa,stroke:#3987e5
+    style You fill:#fff,stroke:#888
+    style GH fill:#fff,stroke:#888
+```
 
 | | |
 |---|---|
@@ -29,6 +54,20 @@ tofu init && tofu apply
 | **Serial console** | a way back in when you break networking, which you will |
 
 Everything is declared here. If the box is lost, `tofu apply` builds it again.
+
+**You do not need to know Kubernetes to use this.** You need to know how to write a
+Dockerfile and push to Git. The deploy loop is:
+
+```mermaid
+flowchart LR
+    A["edit a YAML file<br/>in your repo"] --> B["git push"]
+    B --> C["Argo CD notices<br/>within ~3 min"]
+    C --> D["cluster matches<br/>what Git says"]
+    D -. "you changed something<br/>by hand?" .-> C
+```
+
+That last arrow is the useful part: Argo puts things back. There is no deploy command to
+run and no server to log into.
 
 ---
 

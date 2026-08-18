@@ -102,6 +102,29 @@ jobs:
       - name: applications render, and say what they should
         run: python3 scripts/check-apps.py
 
+  scripts:
+    name: scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash scripts parse
+        run: for f in scripts/*.sh; do bash -n "$f" && echo "OK $f"; done
+
+      # The Windows twin cannot be checked on the author's Mac, and shipping an unverified
+      # script to the people least able to debug it is how a repo earns a reputation.
+      # GitHub's Ubuntu runners have pwsh, so it gets parsed on every push.
+      - name: powershell scripts parse
+        shell: pwsh
+        run: |
+          Get-ChildItem scripts/*.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+            Write-Host "OK $($_.Name)"
+          }
+
   docs:
     name: docs
     runs-on: ubuntu-latest

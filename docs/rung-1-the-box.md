@@ -10,14 +10,40 @@ Git repo, reachable from your laptop.
 
 ## 1. Get the tools
 
-```bash
-# OpenTofu (or Terraform — either works)
-brew install opentofu            # macOS
-# https://opentofu.org/docs/intro/install/  for everything else
+You need three: **OpenTofu** (builds the box), the **OCI CLI** (browser login only), and
+**kubectl** (talks to the cluster).
 
-# The OCI CLI, used only for the browser login
-brew install oci-cli
+**macOS**
+
+```bash
+brew install opentofu oci-cli kubernetes-cli
 ```
+
+**Windows** — PowerShell, no admin needed for winget
+
+```powershell
+winget install OpenTofu.Tofu
+winget install Kubernetes.kubectl
+# the OCI CLI has its own installer:
+powershell -NoProfile -ExecutionPolicy Bypass -Command `
+  "iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.ps1'))"
+```
+
+**Linux**
+
+```bash
+# OpenTofu: https://opentofu.org/docs/intro/install/
+curl -fsSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash
+```
+
+> **Windows users: everything here works in PowerShell**, and every command in these docs
+> that differs is given in both forms. You do **not** need WSL — though if you already have
+> it, using the Linux instructions inside WSL is completely fine and often smoother, since
+> `ssh` and `kubectl` behave identically to everyone else's.
+>
+> ⚠ One thing to get right: **use PowerShell, not the old `cmd.exe`.** The examples use
+> PowerShell quoting, and `cmd` handles quotes differently enough to produce confusing
+> errors.
 
 ## 2. Log in with a browser
 
@@ -84,15 +110,30 @@ Things worth knowing:
 
 ## 5. Get in
 
-`tofu apply` prints the commands. Roughly:
+**The short way** — fetches the kubeconfig and opens every UI at once:
 
 ```bash
-# fetch the cluster credentials (the sed rewrites 127.0.0.1, correct on the box
-# but useless from your laptop, to the public IP)
+./scripts/connect.sh            # macOS, Linux, WSL, Git Bash
+```
+```powershell
+./scripts/connect.ps1           # Windows PowerShell
+```
+
+**Or by hand.** The kubeconfig on the box points at `127.0.0.1`, which is correct *there*
+and useless from your laptop, so it has to be rewritten:
+
+```bash
 ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml' \
   | sed 's/127.0.0.1/<ip>/' > kubeconfig
 export KUBECONFIG=$PWD/kubeconfig
+```
+```powershell
+(ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml') -replace '127\.0\.0\.1','<ip>' |
+  Set-Content kubeconfig
+$env:KUBECONFIG = "$PWD\kubeconfig"
+```
 
+```bash
 kubectl get nodes
 kubectl get pods -A
 ```
@@ -119,6 +160,12 @@ kubectl -n argocd port-forward svc/argocd-server 8080:443
 # then https://localhost:8080  — user: admin
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d
+```
+```powershell
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+# there is no `base64` on Windows; .NET does the decode
+$b64 = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}'
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64))
 ```
 
 Change that password and delete the Secret once you are in.
