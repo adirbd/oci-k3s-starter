@@ -97,6 +97,7 @@ opening a single inbound port** — and Cloudflare Access puts a login in front 
 Skip this rung entirely if you do not own a domain. Everything above keeps working.
 
 → [docs/rung-2-real-urls.md](docs/rung-2-real-urls.md)
+   · no domain? → [serving it without Cloudflare](docs/without-cloudflare.md)
 
 ### Rung 3 — deploy *your* app
 *Needs: your source, and a Dockerfile.*

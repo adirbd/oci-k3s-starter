@@ -1,0 +1,89 @@
+# An ingress controller — for serving your app WITHOUT Cloudflare.
+#
+# ⚠ NOT DEPLOYED UNTIL YOU MOVE IT into kubernetes/applications/, and it does nothing until
+# `enable_public_http = true` opens ports 80/443 in the security list.
+#
+# ── WHY IS THIS NOT ALREADY HERE? ─────────────────────────────────────────────────
+# k3s ships Traefik, and cloud-init disables it with `--disable traefik`. That is
+# deliberate: with a Cloudflare Tunnel (rung 2) the connector terminates the request and
+# hands it straight to a Service, so an ingress controller is a component you run, patch
+# and give ~100 MB to for no benefit.
+#
+# If you are NOT using Cloudflare, you need one — something has to listen on :80 and route
+# by hostname. That is this file.
+#
+# ⚠ AND YOU OWN TLS NOW. The tunnel gave you a valid certificate for free. Here you get
+# plain HTTP unless you add cert-manager and a real domain — see docs/without-cloudflare.md
+# for exactly what that costs you.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: 41.2.0
+    helm:
+      values: |
+        deployment:
+          replicas: 1
+
+        # LoadBalancer works on k3s WITHOUT a cloud load balancer: k3s's built-in servicelb
+        # (klipper) binds the node's host ports directly. cloud-init disables only Traefik,
+        # not servicelb, so this is the one line that makes :80 on the public IP work.
+        #
+        # It also means you are NOT paying for an OCI load balancer, which is the usual way
+        # this gets expensive.
+        service:
+          type: LoadBalancer
+
+        ports:
+          web:
+            port: 8000
+            exposedPort: 80
+            # Uncomment once you have real certificates, to push everyone to HTTPS.
+            # redirections:
+            #   entryPoint:
+            #     to: websecure
+            #     scheme: https
+            #     permanent: true
+          websecure:
+            port: 8443
+            exposedPort: 443
+
+        # Small box: keep it modest.
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 192Mi
+
+        # The dashboard is OFF. It exposes your entire routing table, and the chart's
+        # "secure by default" only means it is not published — it is still one Ingress away
+        # from being public, which is a mistake people make once.
+        ingressRoute:
+          dashboard:
+            enabled: false
+
+        # `log` and `accessLog`, not the `logs:` block older guides show — the chart has a
+        # values SCHEMA and rejects unknown keys outright, which is a kindness: the wrong
+        # key here fails at render instead of being silently ignored like most charts.
+        log:
+          level: INFO
+        accessLog:
+          enabled: true # you will want these the first time a route 404s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

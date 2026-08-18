@@ -271,3 +271,25 @@ variable "tenancy_ocid" {
     error_message = "tenancy_ocid must be a tenancy OCID — it starts with 'ocid1.tenancy'."
   }
 }
+
+variable "enable_public_http" {
+  description = "Open ports 80 and 443 to the internet, for serving your app WITHOUT Cloudflare. Off by default. You also need an ingress controller — see kubernetes/optional/app-traefik.yaml and docs/without-cloudflare.md."
+  type        = bool
+  default     = false
+
+  # ⚠ THIS IS THE ONE SETTING THAT PUTS YOUR CLUSTER ON THE INTERNET.
+  #
+  # It is a legitimate choice — it is how most servers have always worked — but understand
+  # what changes: with the tunnel, nothing listens and your origin IP is unpublished. With
+  # this, anything you expose is directly reachable and scanned within minutes, and you own
+  # the TLS certificate, the renewals and whatever is listening.
+  #
+  # Do NOT combine this with an unauthenticated Grafana (it ships admin/admin) or an
+  # exposed Argo CD, which holds credentials to your infrastructure.
+}
+
+variable "public_http_cidr" {
+  description = "Who may reach ports 80/443 when enable_public_http = true. Defaults to the whole internet, which is the point of a web server — narrow it to your own address if you are only testing."
+  type        = string
+  default     = "0.0.0.0/0"
+}

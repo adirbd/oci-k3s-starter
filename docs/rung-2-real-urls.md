@@ -11,7 +11,10 @@ CDN are all free; you are paying a registrar for a name, not paying Cloudflare.
 > you just point the nameservers at Cloudflare afterwards.
 
 **You can skip this rung entirely.** Everything from rung 1 keeps working with
-`kubectl port-forward`.
+`kubectl port-forward` — and if you want your app public *without* buying a domain, there
+is a third way: [serving it without Cloudflare](without-cloudflare.md), which opens 80/443
+and runs Traefik. You give up the free certificate and the login; the doc is blunt about
+what that costs.
 
 ---
 

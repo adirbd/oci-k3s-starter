@@ -72,6 +72,24 @@ resource "oci_core_security_list" "public" {
     }
   }
 
+  # ── HTTP/HTTPS, only when you asked for it ────────────────────────────────────
+  # dynamic, so the rules simply do not exist when enable_public_http is false — rather
+  # than existing with a source nobody can reach, which is harder to reason about.
+  dynamic "ingress_security_rules" {
+    for_each = var.enable_public_http ? [80, 443] : []
+    content {
+      protocol    = "6" # TCP
+      source      = var.public_http_cidr
+      source_type = "CIDR_BLOCK"
+      description = "HTTP(S) — direct exposure, no tunnel"
+
+      tcp_options {
+        min = ingress_security_rules.value
+        max = ingress_security_rules.value
+      }
+    }
+  }
+
   # Path-MTU discovery. Leave this alone.
   #
   # Without ICMP fragmentation-needed getting back to you, large packets black-hole
