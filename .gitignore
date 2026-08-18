@@ -1,0 +1,29 @@
+# ── Terraform / OpenTofu ────────────────────────────────────────────────────────
+.terraform/
+.terraform.lock.hcl.bak
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Your real values. terraform.tfvars.example is committed; this is not.
+terraform.tfvars
+*.auto.tfvars
+
+# Saved plans. A plan is a point-in-time artefact of one machine's state and can
+# contain resolved values — it has no business in git.
+*.tfplan
+
+# Backend config, if you use a remote backend (it holds bucket + credentials).
+backend.hcl
+
+# ── Secrets — never commit ─────────────────────────────────────────────────────
+*.pem
+*.key
+!*.pub
+.env
+.env.*
+kubeconfig
+*.kubeconfig
+
+# ── OS / editor ────────────────────────────────────────────────────────────────
+.DS_Store

@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars and fill in. That file is gitignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+
+# ── The three you must set ────────────────────────────────────────────────────────
+
+# Your tenancy's HOME region — Always Free lives only there, and it is fixed at signup.
+# Find it top-right in the OCI console.
+region = "eu-frankfurt-1"
+
+# Identity > Compartments in the console. The root compartment (= your tenancy OCID) is a
+# perfectly good answer if you have not created any.
+compartment_ocid = "ocid1.tenancy.oc1..aaaa_REPLACE_ME"
+
+# CONTENT, not a path. This is your only way in until you set up something better.
+ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
+# ...or read it from disk instead:
+# ssh_public_key = file("~/.ssh/id_ed25519.pub")
+
+# ── Optional: everything below has a sensible default ─────────────────────────────
+
+# instance_name  = "k3s-01"
+# ocpus          = 2     # 4 during the free trial; 2 is the permanent allowance
+# memory_gb      = 12    # 24 during the free trial; 12 permanently
+# boot_volume_gb = 50
+
+# Narrow this once you have TESTED another way in — the serial console counts, but only
+# after you have actually used it once.
+# ssh_allowed_cidr = "203.0.113.4/32"
+
+# Point Argo CD at your own repo (rung 3). Defaults to this project's sample.
+# gitops_repo_url  = "https://github.com/you/your-cluster.git"
+# gitops_repo_path = "kubernetes/applications"
+
+# ── Rung 2: Cloudflare. Leave false and everything still works. ───────────────────
+# enable_cloudflare = true
+# domain            = "example.com"
+# cf_account_id     = "..."
+# cf_zone_id        = "..."
+# cf_api_token      = "..."   # better: export TF_VAR_cf_api_token=... instead

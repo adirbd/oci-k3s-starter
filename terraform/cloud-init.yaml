@@ -1,0 +1,186 @@
+#cloud-config
+# First-boot bootstrap: k3s, then Argo CD, then hand over.
+#
+# Everything above the host layer — Grafana, Homepage, your app — is delivered by Argo CD
+# from Git. This file exists only because something has to install k3s before Argo can.
+#
+# ⚠ THIS RUNS EXACTLY ONCE, AT FIRST BOOT. Editing it and re-applying changes nothing on a
+# running box: cloud-init will not re-run, and the OCI provider treats any metadata change
+# as ForceNew (instance.tf carries `ignore_changes = [metadata]` to stop that being a
+# surprise destroy). To deploy a change here:
+#     tofu apply -replace=oci_core_instance.main
+#
+# ── TWO OCI-SPECIFIC LANDMINES ARE HANDLED BELOW, BOTH OF WHICH COST PEOPLE DAYS ──────
+#
+# 1. OCI's Ubuntu images are NOT stock Ubuntu. They ship a populated /etc/iptables/rules.v4
+#    with a REJECT at the end of INPUT — where a normal Ubuntu box filters nothing. k3s pod
+#    and service traffic hits that REJECT and the cluster fails in ways that look like a k3s
+#    bug: pods cannot reach the API server, CoreDNS times out, and nothing in the VCN
+#    security list explains any of it. (UFW is deliberately absent; Oracle discourages it.)
+#
+# 2. Every forum answer says `iptables -F`. DO NOT. Those rules also carry the return path
+#    for the instance metadata service at 169.254.169.254 and, on some shapes, the iSCSI
+#    boot volume attachment — flush them and you can lose the disk you are booting from.
+#    INSERT rules ahead of the REJECT instead, and persist. Surgical and reboot-safe.
+
+package_update: true
+
+packages:
+  - iptables-persistent # so the rules below survive a reboot
+  - ca-certificates
+  - curl
+  - jq
+
+write_files:
+  # k3s needs forwarding and bridged traffic to reach netfilter. Ubuntu's defaults are
+  # close but not identical across images, so set them explicitly rather than hoping.
+  - path: /etc/sysctl.d/99-k3s.conf
+    permissions: "0644"
+    content: |
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+
+  # The app-of-apps root. Argo watches one directory in Git; adding a file there deploys an
+  # app, deleting it retires one. There is no central list to maintain.
+  - path: /etc/k3s-starter/root-application.yaml
+    permissions: "0644"
+    content: |
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: root
+        namespace: argocd
+        finalizers:
+          - resources-finalizer.argocd.argoproj.io
+      spec:
+        project: default
+        source:
+          repoURL: ${gitops_repo_url}
+          targetRevision: HEAD
+          path: ${gitops_repo_path}
+          directory:
+            recurse: true
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: argocd
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+            - CreateNamespace=true
+
+  - path: /usr/local/sbin/k3s-starter-bootstrap.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Idempotent by design: every stage checks whether it is already done. That is what
+      # lets the systemd timer below re-run it safely, so a stage that failed because the
+      # network was not up yet simply succeeds fifteen minutes later instead of leaving
+      # you with a half-built box and no indication of it.
+      set -euo pipefail
+
+      log() { echo "[bootstrap] $*"; }
+
+      # ── k3s ────────────────────────────────────────────────────────────────────────
+      if ! command -v k3s >/dev/null 2>&1; then
+        log "installing k3s (${k3s_channel})"
+        curl -sfL https://get.k3s.io \
+          | INSTALL_K3S_CHANNEL="${k3s_channel}" sh -s - \
+              --write-kubeconfig-mode 0600 \
+              --disable traefik
+        # traefik is disabled deliberately. At rung 1 you reach services with
+        # port-forward; at rung 2 the Cloudflare Tunnel terminates traffic itself. An
+        # ingress controller you are not using is memory you cannot spend on your app.
+      else
+        log "k3s already present"
+      fi
+
+      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+      log "waiting for the node to be Ready"
+      for i in $(seq 1 60); do
+        if kubectl get nodes 2>/dev/null | grep -q ' Ready'; then break; fi
+        sleep 5
+      done
+      kubectl get nodes | grep -q ' Ready' || { log "node never became Ready"; exit 1; }
+
+      # ── Argo CD ────────────────────────────────────────────────────────────────────
+      if ! kubectl get namespace argocd >/dev/null 2>&1; then
+        log "installing Argo CD ${argocd_version}"
+        kubectl create namespace argocd
+        kubectl -n argocd apply -f \
+          "https://raw.githubusercontent.com/argoproj/argo-cd/${argocd_version}/manifests/install.yaml"
+      else
+        log "argocd namespace already present"
+      fi
+
+      log "waiting for the Argo CD API to answer"
+      kubectl -n argocd rollout status deploy/argocd-server --timeout=300s || true
+
+      # ── hand over to Git ───────────────────────────────────────────────────────────
+      # From here on, the cluster's contents come from the repo. Nothing else in this
+      # script installs an application, on purpose: two sources of truth is how a cluster
+      # starts disagreeing with its own description.
+      if ! kubectl -n argocd get application root >/dev/null 2>&1; then
+        log "applying the root application"
+        kubectl apply -f /etc/k3s-starter/root-application.yaml
+      else
+        log "root application already present"
+      fi
+
+      log "done"
+
+  - path: /etc/systemd/system/k3s-starter-bootstrap.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Bootstrap k3s and Argo CD
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/k3s-starter-bootstrap.sh
+      StandardOutput=journal
+      StandardError=journal
+
+  # ⚠ THE TIMER IS THE POINT, not a nicety.
+  #
+  # First boot is the least reliable moment in a machine's life: DNS may not be up, the
+  # package mirror may be slow, GitHub may rate-limit you. A one-shot bootstrap that fails
+  # at minute two leaves a box that looks fine — it is running, it accepts SSH — and is
+  # simply empty. You find out when you go looking, which could be days.
+  #
+  # Re-running an idempotent script every 15 minutes turns that from an outage into a
+  # delay. It also means a rebuild needs no human at all.
+  - path: /etc/systemd/system/k3s-starter-bootstrap.timer
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Re-assert the k3s/Argo bootstrap until it succeeds
+
+      [Timer]
+      OnBootSec=1min
+      OnUnitActiveSec=15min
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - [sysctl, --system]
+
+  # ⚠ INSERT at position 1 — ahead of Oracle's REJECT — never flush. See the header.
+  # 10.42.0.0/16 and 10.43.0.0/16 are k3s's default pod and service CIDRs.
+  - iptables -I INPUT 1 -s 10.42.0.0/16 -m comment --comment "k3s pod CIDR" -j ACCEPT
+  - iptables -I INPUT 1 -s 10.43.0.0/16 -m comment --comment "k3s service CIDR" -j ACCEPT
+  - iptables -I FORWARD 1 -s 10.42.0.0/16 -m comment --comment "k3s pod CIDR" -j ACCEPT
+  - iptables -I FORWARD 1 -d 10.42.0.0/16 -m comment --comment "k3s pod CIDR" -j ACCEPT
+  - netfilter-persistent save
+
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, k3s-starter-bootstrap.timer]
+  - [systemctl, start, --no-block, k3s-starter-bootstrap.service]
+
+final_message: "cloud-init done after $UPTIME s — the bootstrap timer takes it from here"
