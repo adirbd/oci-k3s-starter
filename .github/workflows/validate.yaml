@@ -110,6 +110,21 @@ jobs:
       - name: relative links resolve
         run: python3 scripts/check-links.py
 
+  renovate:
+    name: renovate config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Caught a real error the day it was added: JSON5 has no string concatenation, so a
+      # description written as 'a' + 'b' is a parse failure — and an unparseable config is
+      # a Renovate that opens nothing, silently.
+      #
+      # ⚠ PIN THE VALIDATOR. `renovate@latest` resolved to a version the registry does not
+      # serve, and an unpinned older one rejected `managerFilePatterns` (which replaced
+      # `fileMatch`) — i.e. it failed correct config. A stale validator is worse than none.
+      - name: validate renovate.json5
+        run: npx --yes --package renovate@44.30.4 -- renovate-config-validator .github/renovate.json5
+
   secrets:
     name: secrets
     runs-on: ubuntu-latest

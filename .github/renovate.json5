@@ -1,0 +1,79 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+
+  // ⚠ THIS FILE DOES NOTHING ON ITS OWN.
+  // Renovate is a GitHub App, and config without the App installed is a file that looks
+  // like automation and opens zero pull requests — silently, forever. Install it on this
+  // repo at https://github.com/apps/renovate, then treat "when did the bot last open a
+  // PR?" as a health signal. A quiet Renovate and a working Renovate look identical.
+
+  extends: [
+    'config:recommended',
+    ':dependencyDashboard', // one issue listing everything pending, including what it skipped
+    ':semanticCommits',
+  ],
+
+  timezone: 'Asia/Jerusalem',
+
+  // A starter repo rots by drifting: six months of unattended updates and someone clones
+  // a config that no longer applies. But a wall of PRs is its own kind of dead, so this is
+  // tuned for "few, and worth reading".
+  prConcurrentLimit: 5,
+  prHourlyLimit: 2,
+
+  // Let a release sit for three days before proposing it. Enough for the ".0 was broken,
+  // here is .1" cycle to play out somewhere other than your cluster.
+  minimumReleaseAge: '3 days',
+
+  // The Argo CD `Application` manifests. NOT the default path for this manager — its
+  // default only matches `argocd/**`, so without this every chart pin here would be
+  // invisible and the file would still look correctly configured.
+  argocd: {
+    managerFilePatterns: ['/kubernetes/applications/.+\\.ya?ml$/'],
+  },
+
+  // Image tags and versions that live inside strings no manager understands: the Helm
+  // values block embedded in an Argo Application, and Terraform variable defaults. Both
+  // are marked with a `# renovate:` comment at the line above.
+  customManagers: [
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/kubernetes/applications/.+\\.ya?ml$/',
+        '/terraform/.+\\.tf$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)\\s+[a-zA-Z_]+\\s*[:=]\\s*"?(?<currentValue>[^"\\s]+)"?',
+      ],
+      // Tags here are v-prefixed release names, which is not always strict semver.
+      versioningTemplate: 'loose',
+    },
+  ],
+
+  packageRules: [
+    {
+      description: 'Group the GitHub Actions bumps — they are noise individually.',
+      matchManagers: ['github-actions'],
+      groupName: 'github actions',
+    },
+    {
+      description: 'Kubernetes chart majors are not routine: they move resource shapes and can strand data. Read the upgrade notes.',
+      matchManagers: ['argocd', 'helm-values'],
+      matchUpdateTypes: ['major'],
+      addLabels: ['read-the-release-notes'],
+      minimumReleaseAge: '14 days',
+    },
+    {
+      description: 'Terraform provider majors likewise — the OCI provider is at 8.x after 200+ releases, and a major will move resource shapes under you.',
+      matchManagers: ['terraform'],
+      matchUpdateTypes: ['major'],
+      addLabels: ['read-the-release-notes'],
+      minimumReleaseAge: '14 days',
+    },
+    {
+      description: 'Argo CD is installed at FIRST BOOT ONLY, so bumping this variable does not upgrade a running cluster — it changes what the NEXT rebuild installs. Labelled so the PR does not read as a live upgrade.',
+      matchDepNames: ['argoproj/argo-cd'],
+      addLabels: ['affects-next-rebuild-only'],
+    },
+  ],
+}

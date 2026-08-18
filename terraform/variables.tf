@@ -163,7 +163,8 @@ variable "k3s_channel" {
 variable "argocd_version" {
   description = "Argo CD version to install at first boot. Pinned rather than 'stable' so a rebuild six months from now produces the same cluster."
   type        = string
-  default     = "v3.2.0"
+  # renovate: datasource=github-releases depName=argoproj/argo-cd
+  default = "v3.5.1"
 }
 
 variable "gitops_repo_url" {

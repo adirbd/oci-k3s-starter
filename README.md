@@ -127,6 +127,17 @@ The default here is sized to fit inside the smaller allowance on purpose. See
 how much is left for your app — the answer is roughly half, and knowing that up front is
 better than learning it from an OOMKill.
 
+## Keeping it current
+
+Version pins go stale, and a starter repo that installs last year's everything is worse
+than no starter repo. [Renovate](https://github.com/apps/renovate) is configured here to
+open pull requests for the chart, image, provider and Argo CD pins.
+
+> ⚠ **The config does nothing until the App is installed on the repo.** A `renovate.json5`
+> with no Renovate behind it opens zero PRs, silently and forever — and looks exactly like
+> a Renovate with nothing to do. Treat *"when did the bot last open a PR?"* as a health
+> signal.
+
 ## Where this came from
 
 Extracted from a working two-site homelab where this box is the off-site half — it watches
