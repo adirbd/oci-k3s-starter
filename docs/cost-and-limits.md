@@ -76,6 +76,21 @@ quarter of the machine, not most of it.
 - **NAT gateways.** Not used. The single subnet is public.
 - **Block volumes beyond 200 GB**, and **backups** of them.
 
+## The one thing that is not free
+
+**A domain — about $10 a year.** That is the entire bill for this repo, and it is optional:
+rung 1 needs no domain at all.
+
+To be precise about who charges you: **Cloudflare's plan is free** — the tunnel, the TLS
+certificate, Access with SSO, DDoS protection, the WAF and the CDN all cost nothing on the
+free tier. What costs money is *registering a name*, which you pay a registrar for.
+Cloudflare Registrar happens to sell at wholesale with no markup (~$10.44/yr for `.com`),
+and other TLDs are often cheaper.
+
+Whether it is worth it is argued in full in [rung 2](rung-2-real-urls.md) — the short
+version is that a valid HTTPS certificate is not cosmetic, since browsers disable service
+workers, passkeys, the clipboard API and camera access on insecure origins.
+
 ## Watch it yourself
 
 Set a budget alert. Free tier or not, it is one click and it turns "surprise bill" into

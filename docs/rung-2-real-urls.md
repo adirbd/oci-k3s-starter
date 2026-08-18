@@ -1,9 +1,93 @@
 # Rung 2 — real URLs instead of port-forward
 
-**You need:** a domain whose nameservers point at Cloudflare. Free.
+**You need:** a domain, with its nameservers pointed at Cloudflare.
+
+**This is the only part of this repo that costs money** — roughly **$10 a year** for the
+domain. Cloudflare's plan, the tunnel, the certificate, Access, the DDoS protection and the
+CDN are all free; you are paying a registrar for a name, not paying Cloudflare.
+
+> Cloudflare Registrar sells at wholesale with no markup (~$10.44/yr for a `.com`), and
+> other TLDs go cheaper — a `.xyz` or `.dev` is often a few dollars. Any registrar works;
+> you just point the nameservers at Cloudflare afterwards.
 
 **You can skip this rung entirely.** Everything from rung 1 keeps working with
 `kubectl port-forward`.
+
+---
+
+## Why it is worth ten dollars
+
+Nine reasons, and the first one is the one people underestimate.
+
+### 1. A valid HTTPS certificate, forever, with no work
+
+Not "encrypted" — **valid**, as in no browser warning and a real padlock. This matters more
+than it sounds, because **modern browsers refuse to run large parts of the web platform on
+an insecure origin**: service workers, WebAuthn/passkeys, the clipboard API, camera and
+microphone, geolocation, PWA installation, and HTTP/2 all require HTTPS.
+
+Without it you are not merely seeing a warning — you are developing against a browser with
+features switched off, and debugging why your app behaves differently on your laptop than
+in production.
+
+The alternative is running cert-manager, solving a DNS-01 challenge, and owning a renewal
+that fails silently at 3am. Here the certificate is Cloudflare's problem and always has
+been.
+
+### 2. Nothing is listening on the internet
+
+The connector dials **out**. Your security list keeps exactly one inbound rule, for SSH.
+There is no web port to scan, no ingress controller to have a CVE, and no "I'll just open
+443 for a minute".
+
+### 3. Your server's IP is never published
+
+Traffic reaches Cloudflare, not you. An attacker who wants to hit your box directly has to
+find it first, and DNS will not tell them. Origin-IP exposure is how most "I was behind
+Cloudflare and still got attacked" stories start.
+
+### 4. A login in front of everything, that you did not write
+
+Cloudflare Access checks identity **before** the request reaches your cluster. Grafana ships
+`admin/admin`; Argo CD holds credentials to your infrastructure. Neither should be answering
+strangers, and writing your own auth layer for internal tools is a bad use of a weekend.
+
+Adding a collaborator is adding their email address. There are no user accounts on your box
+to create, rotate or forget to remove.
+
+### 5. It works from networks you do not control
+
+Corporate wifi, hotel wifi, mobile carriers behind CGNAT, and any network blocking
+non-standard ports — all fine, because it is ordinary HTTPS to an ordinary hostname. A
+`kubectl port-forward` needs the API server reachable; this does not.
+
+### 6. Your box's IP can change and nothing breaks
+
+The instance has an *ephemeral* public address. The DNS records point at the tunnel, not at
+an IP, so a rebuild costs you nothing. Without this you are maintaining dynamic DNS.
+
+### 7. DDoS, WAF and bot protection, at no cost
+
+Absorbed at the edge before it reaches a box that has two cores. Also: your Grafana will not
+be crawled and indexed, which is a surprisingly common way people discover their dashboards
+were public.
+
+### 8. URLs you can actually share
+
+`grafana.example.com` opens on your phone, on someone else's laptop, in a message to a
+friend. `localhost:3001` opens nowhere, and a shared demo is most of the point of running
+something publicly at all.
+
+### 9. It is less machinery, not more
+
+Opening 443 the traditional way means an ingress controller, a certificate issuer, an ACME
+solver, a renewal cron, and a listening port — five things that can break. The tunnel is one
+deployment that dials out.
+
+> **No domain, want to try it anyway?** `cloudflared tunnel --url http://localhost:3000`
+> gives you a random `*.trycloudflare.com` address with no account and no domain. It is
+> ephemeral and has no Access in front of it, so treat it as a demo rather than a setup —
+> but it costs nothing and shows you the shape of the thing.
 
 ---
 

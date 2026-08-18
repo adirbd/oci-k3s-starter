@@ -89,7 +89,7 @@ work.
 → [docs/rung-1-the-box.md](docs/rung-1-the-box.md)
 
 ### Rung 2 — real URLs instead of port-forward
-*Needs: a domain on Cloudflare. Optional, and free.*
+*Needs: a domain — about $10/year. The only thing in this repo that costs money.*
 
 Adds a Cloudflare Tunnel, so `grafana.yourdomain.com` works from anywhere — **without
 opening a single inbound port** — and Cloudflare Access puts a login in front of it.
@@ -127,8 +127,11 @@ instance principal — so there is no API key on the server to steal or rotate.
 
 **Recommended, not required**
 
-- **Cloudflare** + a domain — real hostnames and SSO, with no ports open. Strongly
-  recommended, and everything still works without it (rung 1 needs none of it).
+- **Cloudflare** + a domain — **the one thing here that costs money** (~$10/year for the
+  domain; the Cloudflare plan itself is free). Strongly recommended anyway: it is what
+  gives you a valid HTTPS certificate, a login in front of everything, and no open ports.
+  Everything still works without it — rung 1 needs none of it. See
+  [rung 2](docs/rung-2-real-urls.md) for why it is worth ten dollars.
 - **Tailscale** — a private path to the box that survives you breaking the public one.
 - **healthchecks.io** / **ntfy** — free, for "tell me when it dies" and "tell my phone".
 
