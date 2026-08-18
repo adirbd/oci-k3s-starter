@@ -181,7 +181,7 @@ variable "argocd_version" {
 }
 
 variable "gitops_repo_url" {
-  description = "Repo Argo CD watches. ⚠ IT MUST BE CLONEABLE ANONYMOUSLY — Argo gets no credentials at first boot, so a PRIVATE repo here means the root Application fails and nothing deploys. Public repo: nothing to configure. Private: see docs/rung-3-your-app.md."
+  description = "Repo Argo CD watches. Defaults to this project (public), so the first apply deploys a working sample with no credentials. ⚠ When you point this at YOUR repo: Argo gets no credentials at first boot, so a private repo needs a step — see docs/rung-3-your-app.md."
   type        = string
   default     = "https://github.com/adirbd/oci-k3s-starter.git"
 }

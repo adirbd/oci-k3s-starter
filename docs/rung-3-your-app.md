@@ -83,6 +83,18 @@ your-repo/
     └── my-worker.yaml
 ```
 
+> ### ⚠ Read this before you point Argo at your own repo
+> **Your repo is probably private. Argo has no credentials.**
+>
+> The starter's default works because this project is public. The moment you swap in your
+> own — which is the entire point of this rung — Argo has to authenticate, and if it
+> cannot, the failure is quiet: the cluster stays healthy, the apply stays green, and
+> nothing deploys. You will look at Kubernetes for an hour before you look at the clone.
+>
+> Two ways through, in the next two sections. If you are just trying this out, **making the
+> manifests repo public is completely reasonable** — it holds YAML, not secrets, and rung 4
+> exists so it never has to hold secrets.
+
 ## Public repo — nothing to configure
 
 ```hcl

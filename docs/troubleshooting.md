@@ -140,8 +140,11 @@ kubectl -n argocd get application root -o jsonpath='{.status.conditions}' | jq
 
 **`repository not found` / `authentication required`** means Argo cannot clone the repo. It
 is given **no credentials at first boot**, so `gitops_repo_url` has to be cloneable
-anonymously. A private repo — including a private fork of this one — fails here, and the
-symptom is a healthy-looking cluster with nothing in it.
+anonymously.
+
+Almost always this is because you pointed it at **your own repo, which is private** — the
+starter's default is public and works untouched. The symptom is the confusing part: a
+healthy cluster, a green apply, and nothing in it.
 
 Fix: make the repo public, or give Argo credentials
 ([rung 3](rung-3-your-app.md#private-repo--app-vs-token)) and then:

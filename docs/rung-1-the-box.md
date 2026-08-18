@@ -140,11 +140,10 @@ kubectl get pods -A
 
 > The login user is **`ubuntu`** — not `root`, and not `opc` (that is Oracle Linux).
 
-> ⚠ **The repo Argo watches must be public.** Argo CD is given no credentials at first
-> boot, so `gitops_repo_url` has to be cloneable anonymously. If you forked this repo
-> privately, or the upstream is private, the root Application fails and you get a running
-> cluster with nothing in it — see
-> [troubleshooting](troubleshooting.md#argo-is-up-but-no-apps-appear-at-all).
+> The default `gitops_repo_url` is this repo, which is public, so there is nothing to
+> configure here. It becomes something to think about at [rung 3](rung-3-your-app.md), when
+> you point Argo at *your* repo — Argo gets no credentials at first boot, so a private one
+> needs a step.
 
 ### If the cluster is not there yet, wait
 
