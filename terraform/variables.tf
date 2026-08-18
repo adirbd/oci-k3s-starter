@@ -250,3 +250,24 @@ variable "access_allowed_emails" {
   type        = list(string)
   default     = []
 }
+
+# ══════════════════════════════════════════════════════════════════════════════════
+#  RUNG 4 — OCI Vault. OFF by default.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+variable "enable_vault" {
+  description = "Create an OCI Vault plus the IAM that lets this instance read it BY BEING ITSELF — no API key on the box. Requires tenancy_ocid, and an account allowed to create dynamic groups and policies (the tenancy owner is; a restricted user may not be)."
+  type        = bool
+  default     = false
+}
+
+variable "tenancy_ocid" {
+  description = "Your tenancy OCID. REQUIRED when enable_vault = true, because dynamic groups and policies are tenancy-level objects and cannot be created anywhere else. Find it under Profile > Tenancy."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.tenancy_ocid == null || startswith(coalesce(var.tenancy_ocid, "ocid1."), "ocid1.tenancy")
+    error_message = "tenancy_ocid must be a tenancy OCID — it starts with 'ocid1.tenancy'."
+  }
+}

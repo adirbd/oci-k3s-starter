@@ -58,3 +58,8 @@ ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
 #   grafana = { service = "http://vm-stack-grafana.observability.svc.cluster.local:80" }
 #   argocd  = { service = "https://argocd-server.argocd.svc.cluster.local:443", no_tls_verify = true }
 # }
+
+# ── Rung 4: OCI Vault ─────────────────────────────────────────────────────────────
+# enable_vault = true
+# tenancy_ocid = "ocid1.tenancy.oc1..aaaa_REPLACE_ME"   # required: dynamic groups and
+#                                                        # policies are tenancy-level

@@ -10,7 +10,7 @@ A values file is a REQUEST. The only way to know what it did is to render the ch
 read the answer.
 
   1. RENDER       — the chart renders at all with these values
-  2. NAME LENGTH  — no rendered name exceeds Kubernetes' 63-character limit
+  2. NAME LENGTH  — Services and pod volume names stay inside the 63-character limit
   3. ASSERTIONS   — per-app facts about the OUTPUT, listed below
 
 ⚠ A NOTE ON THE CHECK THAT IS NOT HERE. The obvious idea — flag values keys that do not
@@ -28,7 +28,17 @@ import sys
 import glob
 import yaml
 
-MAX_NAME = 63  # DNS-1035 labels (Services) and pod volume names
+# ⚠ 63 IS NOT A UNIVERSAL LIMIT, and applying it as one produces false failures.
+#
+# DNS-1035 LABELS cap at 63: Service names, and pod volume names. Those are the ones that
+# bite — a Service name of 70 chars gives you a chart that installs and then fails at
+# runtime with an error that never mentions length.
+#
+# DNS-1123 SUBDOMAINS cap at 253: CustomResourceDefinitions, ClusterRoles, ServiceAccounts,
+# Jobs. External Secrets legitimately ships a 98-character CRD name
+# (beyondtrustworkloadcredentialsdynamicsecrets.generators.external-secrets.io) — flagging
+# that is the checker being wrong, not the chart.
+MAX_LABEL = 63
 
 
 def sh(*args):
@@ -128,11 +138,26 @@ def main() -> int:
             continue
 
         docs = [d for d in yaml.safe_load_all(r.stdout) if d]
-        problems = [
-            f"name over {MAX_NAME} chars: {d['kind']}/{d['metadata']['name']}"
-            for d in docs
-            if len(d.get("metadata", {}).get("name", "")) > MAX_NAME
-        ]
+        problems = []
+
+        for d in docs:
+            dname = d.get("metadata", {}).get("name", "")
+            if d["kind"] == "Service" and len(dname) > MAX_LABEL:
+                problems.append(
+                    f"Service name is {len(dname)} chars, over the {MAX_LABEL} DNS-1035 "
+                    f"limit: {dname}"
+                )
+            # Pod volume names are labels too, and this is the one nobody sees coming:
+            # the chart installs, then pods fail to schedule.
+            spec = (d.get("spec", {}).get("template", {}).get("spec")
+                    or d.get("spec", {}).get("jobTemplate", {}).get("spec", {})
+                    .get("template", {}).get("spec") or {})
+            for vol in spec.get("volumes", []) or []:
+                if len(vol.get("name", "")) > MAX_LABEL:
+                    problems.append(
+                        f"volume name is {len(vol['name'])} chars, over {MAX_LABEL}: "
+                        f"{d['kind']}/{dname} -> {vol['name']}"
+                    )
         if name in ASSERTIONS:
             problems += ASSERTIONS[name](docs)
 

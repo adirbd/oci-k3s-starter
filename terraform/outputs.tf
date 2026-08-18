@@ -82,3 +82,32 @@ output "access_status" {
     : "⚠ PUBLIC — no access_allowed_emails set, so these hostnames are open to the internet"
   )
 }
+
+# ── Rung 4 outputs ────────────────────────────────────────────────────────────────
+
+output "vault_ocid" {
+  description = "OCID of the vault. An identifier, not a secret — you need it to store secrets in the right place."
+  value       = var.enable_vault ? oci_kms_vault.main[0].id : null
+}
+
+output "clustersecretstore_manifest" {
+  description = "The ClusterSecretStore, filled in with your vault and region. Apply it with: tofu output -raw clustersecretstore_manifest | kubectl apply -f -"
+  value = var.enable_vault ? yamlencode({
+    apiVersion = "external-secrets.io/v1"
+    kind       = "ClusterSecretStore"
+    metadata   = { name = "oci-vault" }
+    spec = {
+      provider = {
+        oracle = {
+          vault  = oci_kms_vault.main[0].id
+          region = var.region
+          # No auth block, no serviceAccountRef, no credential anywhere. ESO calls the
+          # instance metadata service from the pod; OCI recognises the machine; the IAM
+          # policy decides what it may read. Rotating a credential is impossible because
+          # there is not one.
+          principalType = "InstancePrincipal"
+        }
+      }
+    }
+  }) : "(set enable_vault = true first)"
+}
