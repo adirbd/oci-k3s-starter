@@ -136,7 +136,7 @@ Nothing to register, nothing to configure — enough to test hostname routing to
 
 You have opened your cluster to the internet. Two things follow, and neither is optional:
 
-**Do not expose Grafana or Argo CD.** Grafana ships `admin/admin`. Argo CD holds
+**Do not expose Grafana or Argo CD.** Grafana has a generated admin password, but it is still a login on the public internet. Argo CD holds
 credentials to your infrastructure. Reach those with `./scripts/connect.sh` as before, and
 give an Ingress only to your own app.
 

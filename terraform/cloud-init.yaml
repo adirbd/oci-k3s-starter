@@ -71,6 +71,32 @@ write_files:
           syncOptions:
             - CreateNamespace=true
 
+  # Grafana's admin credentials, delivered to the cluster rather than left at admin/admin.
+  #
+  # ⚠ THIS PUTS THE PASSWORD IN INSTANCE METADATA, which anything running ON the box can
+  # read via 169.254.169.254. That is a real exposure and worth stating plainly — but it is
+  # the same audience that can already read the Kubernetes Secret directly, so it does not
+  # widen who can see it. It is not visible from outside the instance.
+  - path: /etc/k3s-starter/grafana-admin.yaml
+    permissions: "0600"
+    content: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: grafana-admin
+        namespace: observability
+      type: Opaque
+      stringData:
+        admin-user: admin
+        admin-password: "${grafana_admin_password}"
+
+  # Empty unless enable_vault = true — instance.tf passes "" and this stays a blank file
+  # the bootstrap skips.
+  - path: /etc/k3s-starter/clustersecretstore.yaml
+    permissions: "0644"
+    content: |
+      ${clustersecretstore}
+
   - path: /usr/local/sbin/k3s-starter-bootstrap.sh
     permissions: "0755"
     content: |
@@ -137,11 +163,38 @@ write_files:
       # From here on, the cluster's contents come from the repo. Nothing else in this
       # script installs an application, on purpose: two sources of truth is how a cluster
       # starts disagreeing with its own description.
-      if ! kubectl -n argocd get application root >/dev/null 2>&1; then
-        log "applying the root application"
-        kubectl apply -f /etc/k3s-starter/root-application.yaml
-      else
-        log "root application already present"
+      # ⚠ APPLIED EVERY RUN, NOT ONCE — the fix for a real complaint (#13).
+      # This used to skip when the Application already existed, which made the root app a
+      # snowflake: created at first boot and never reconciled again. Repointing Argo at a
+      # different repo then meant hand-editing a live object over SSH, with `kubectl patch`
+      # JSON quoting that is easy to mangle.
+      #
+      # Applying unconditionally makes /etc/k3s-starter/root-application.yaml the source of
+      # truth ON THE BOX: edit it, wait for the 15-minute timer (or run
+      # `systemctl start k3s-starter-bootstrap`), and Argo follows.
+      # scripts/set-gitops-repo.sh does exactly that for you.
+      log "asserting the root application"
+      kubectl apply -f /etc/k3s-starter/root-application.yaml
+
+      # ── Grafana's password ───────────────────────────────────────────────────────
+      # Applied every run, before Argo installs Grafana: the chart is configured with
+      # admin.existingSecret, so the Secret has to exist or the pod waits for it. Creating
+      # the namespace here is harmless — Argo creates it too, and both are idempotent.
+      log "asserting the Grafana admin secret"
+      kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+      kubectl apply -f /etc/k3s-starter/grafana-admin.yaml
+
+      # ── the vault store, when rung 4 is on ───────────────────────────────────────
+      # Applied here rather than by hand (#12). External Secrets needs a ClusterSecretStore
+      # before any ExternalSecret resolves, and asking a human to paste one from a terraform
+      # output is a step that gets forgotten and does not survive a rebuild.
+      #
+      # Harmless before the operator exists: the apply fails while the CRD is absent, and
+      # the timer retries in fifteen minutes, by which time Argo has deployed it.
+      if [ -s /etc/k3s-starter/clustersecretstore.yaml ]; then
+        log "asserting the OCI Vault ClusterSecretStore"
+        kubectl apply -f /etc/k3s-starter/clustersecretstore.yaml || \
+          log "  (external-secrets CRDs not present yet — will retry next run)"
       fi
 
       log "done"

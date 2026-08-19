@@ -55,7 +55,7 @@ output "urls" {
 }
 
 output "cloudflared_secret_command" {
-  description = "Create the Kubernetes Secret the connector reads. Run this once after enabling Cloudflare; the token is piped from Terraform straight into kubectl so it never lands in a file or your shell history."
+  description = "Create the Kubernetes Secret the connector reads, on macOS/Linux/WSL. Windows PowerShell needs a different form — see cloudflared_secret_command_windows. Better still, enable rung 4 and skip this entirely."
   # Creates the namespace first: the Secret has to exist BEFORE the connector pod starts,
   # but the namespace is normally made by Argo when the app syncs — so doing it here breaks
   # the ordering problem without needing a Kubernetes provider in this root module.
@@ -65,6 +65,16 @@ output "cloudflared_secret_command" {
     "kubectl create secret generic cloudflared-token",
     "-n cloudflared --from-file=token=/dev/stdin",
     "--dry-run=client -o yaml | kubectl apply -f -",
+  ]) : "(set enable_cloudflare = true first)"
+}
+
+output "cloudflared_secret_command_windows" {
+  description = "The same thing for Windows PowerShell. /dev/stdin does not exist there, so the token goes via a variable instead of a pipe — it is briefly visible to `ps`, which is an acceptable trade on your own laptop and another reason rung 4 is the better answer."
+  value = var.enable_cloudflare ? join(" ", [
+    "kubectl create namespace cloudflared --dry-run=client -o yaml | kubectl apply -f -;",
+    "$t = tofu output -raw cloudflared_token;",
+    "kubectl create secret generic cloudflared-token -n cloudflared",
+    "--from-literal=token=$t --dry-run=client -o yaml | kubectl apply -f -",
   ]) : "(set enable_cloudflare = true first)"
 }
 
@@ -110,4 +120,17 @@ output "clustersecretstore_manifest" {
       }
     }
   }) : "(set enable_vault = true first)"
+}
+
+output "vault_secret_names" {
+  description = "Names of the entries Terraform put in the vault. These are what an ExternalSecret's remoteRef.key must match — they follow instance_name, so they change if you rename the box."
+  value = var.enable_vault ? compact([
+    var.enable_cloudflare ? oci_vault_secret.cloudflared_token[0].secret_name : "",
+  ]) : []
+}
+
+output "grafana_admin_password" {
+  description = "Grafana's admin password, generated rather than admin/admin. Read it with `tofu output -raw grafana_admin_password`. The user is `admin`."
+  value       = random_password.grafana_admin.result
+  sensitive   = true
 }

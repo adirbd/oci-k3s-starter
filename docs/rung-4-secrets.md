@@ -83,15 +83,19 @@ cp kubernetes/optional/app-external-secrets.yaml kubernetes/applications/
 git commit -am "add external secrets" && git push
 ```
 
+> **The ClusterSecretStore applies itself.** When `enable_vault = true`, Terraform renders it
+> into cloud-init and the box applies it on every bootstrap run — so there is nothing to
+> paste, and a rebuilt cluster gets it back without anyone typing. The
+> `clustersecretstore_manifest` output still exists if you want to inspect or apply it by
+> hand.
+>
+> It is applied on a timer, so if External Secrets is not installed yet the first attempt
+> fails harmlessly and the next run (within 15 minutes) succeeds.
+
 > ⚠ Do not run the second form before rung 3. Out of the box `gitops_repo_url` points at
 > **this** project, so a push goes somewhere Argo is not watching — or fails outright — and
 > the symptom is simply nothing happening.
 
-Then, once Argo reports it Healthy:
-
-```bash
-tofu output -raw clustersecretstore_manifest | kubectl apply -f -
-```
 
 The manifest is generated with your vault OCID and region already in it, so there is
 nothing to paste.
@@ -136,12 +140,29 @@ env:
 
 ## What rungs 2 and 4 do together
 
-If Cloudflare is also enabled, Terraform writes the **tunnel token straight into the
-vault** — so the manual "pipe this into kubectl" step from rung 2 disappears, and a rebuilt
-box fetches its own connector credential by being itself.
+With both enabled, Terraform writes the **tunnel token straight into the vault**, and one
+more file replaces rung 2's manual `kubectl create secret` step for good:
 
-That is the whole argument for this rung in one resource: the credential exists, but never
-on a laptop, never in a shell, and never on the instance's disk.
+```bash
+cp kubernetes/optional/externalsecret-cloudflared.yaml kubernetes/applications/
+git commit -am "cloudflared reads its token from the vault" && git push
+```
+
+That deploys an `ExternalSecret` which maps the vault entry to the `cloudflared-token`
+Secret the connector reads. From then on the credential exists, but **never on a laptop,
+never in a shell, and never in this repository** — and because the ExternalSecret lives in
+Git, a rebuilt cluster recreates it without anyone typing anything.
+
+> ⚠ **It must be in Git, not applied by hand.** A hand-applied ExternalSecret disappears
+> with the cluster, which puts you back to re-running the manual command after every
+> rebuild — the exact problem this removes.
+>
+> ⚠ **Check the key name if you renamed the box.** Terraform stores the token as
+> `<instance_name>-cloudflared-token`; the file ships with the default `k3s-01-...`.
+> `tofu output vault_secret_names` prints the real name.
+
+Order matters: External Secrets and the ClusterSecretStore have to exist first, so do the
+steps above this section before this one.
 
 ## Deliberate limits
 

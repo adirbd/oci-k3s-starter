@@ -97,13 +97,29 @@ spec:
           persistence:
             enabled: false
 
-          # ⚠ CHANGE THIS, or put Cloudflare Access in front of it at rung 2.
-          # It is admin/admin until you do.
-          adminPassword: admin
+          # NOT admin/admin, and nothing for you to invent or remember.
+          #
+          # Terraform generates a password, cloud-init delivers it as the `grafana-admin`
+          # Secret before Argo installs this chart, and you read it with:
+          #     tofu output -raw grafana_admin_password
+          #
+          # A rebuild produces the SAME password, because it lives in Terraform state rather
+          # than in someone's head — which is the failure the old default caused: log in with
+          # admin/admin, change it, forget it, reinstall Grafana to get back in.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
 
           sidecar:
             dashboards:
               enabled: true # picks up ConfigMaps labelled grafana_dashboard: "1"
+
+          # Land on the curated dashboard rather than a list of dashboards. Without this,
+          # opening Grafana shows a directory and the useful one is three clicks away.
+          grafana.ini:
+            dashboards:
+              default_home_dashboard_path: /tmp/dashboards/your-cluster.json
 
         # A curated few, rather than everything the chart ships.
         #
@@ -124,8 +140,11 @@ spec:
           enabled: true
           dashboards:
             # ── kept ──────────────────────────────────────────────────────────────
+            # ⚠ ~200 panels. Genuinely useful when you have a specific question about the
+            # host, genuinely overwhelming as a first impression — which is what a new user
+            # reported. Kept, because "my box is slow" needs it; not the landing page.
             node-exporter-full:
-              enabled: true # the box: CPU, memory, disk, network
+              enabled: true
             victoriametrics-single-node:
               enabled: true # is the monitoring itself healthy
             victoriametrics-vmagent:

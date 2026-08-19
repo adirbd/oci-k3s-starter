@@ -10,6 +10,7 @@ description.
 ```
 applications/                  deployed automatically
 ├── infra-observability.yaml   VictoriaMetrics + Grafana
+├── infra-dashboard.yaml       the one dashboard worth opening
 ├── app-homepage.yaml          one page listing everything
 └── app-sample.yaml            podinfo — proof it works, delete when done
 

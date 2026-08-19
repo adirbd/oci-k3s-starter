@@ -6,8 +6,10 @@ Two kinds of thing live here. **Only the first is for you.**
 
 | | |
 |---|---|
+| `preflight.sh` / `.ps1` | check tools, tfvars, OCI session and Cloudflare Access before applying |
 | `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
 | `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
+| `set-gitops-repo.sh` | point Argo CD at a different repo on a running box |
 
 ```bash
 ./scripts/retry-apply.sh      # when apply says "Out of host capacity"

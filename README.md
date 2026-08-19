@@ -202,6 +202,18 @@ open pull requests for the chart, image, provider and Argo CD pins.
 > a Renovate with nothing to do. Treat *"when did the bot last open a PR?"* as a health
 > signal.
 
+## State and tokens
+
+Two questions that arrive on day two — where Terraform state should live once local stops
+being enough, and where to keep your Cloudflare token — are answered in
+**[docs/state-and-credentials.md](docs/state-and-credentials.md)**.
+
+The short versions: put state in **OCI Object Storage**, because Always Free includes 20 GB
+and it speaks S3, so it needs no new vendor — and encrypt it, because state contains the
+Grafana password and the console private key in cleartext. For the token, export
+**`CLOUDFLARE_API_TOKEN`** (the provider reads it natively) from your password manager at
+the start of a session, rather than writing it to a file.
+
 ## Removing it
 
 ```bash

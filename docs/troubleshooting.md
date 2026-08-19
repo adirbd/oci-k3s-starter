@@ -129,13 +129,26 @@ tofu apply -replace=oci_core_instance.main
 
 ## Terraform says my SSH key is invalid
 
-The variable wants the **public** key as content:
+The variable wants the **public** key as content, pasted in:
 
 ```hcl
-ssh_public_key = file("~/.ssh/id_ed25519.pub")   # note .pub
+ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
 ```
 
-If it starts with `-----BEGIN`, that is the private half. Do not put that there.
+Print it to copy:
+
+```bash
+cat ~/.ssh/id_ed25519.pub            # macOS, Linux, WSL
+```
+```powershell
+Get-Content ~\.ssh\id_ed25519.pub    # Windows
+```
+
+Two things that catch people:
+
+- **`Function calls not allowed`** — a `.tfvars` file takes literal values only, so
+  `file(...)` and `pathexpand(...)` fail to parse. Paste the content instead.
+- If it starts with `-----BEGIN`, that is the **private** half. Do not put that there.
 
 ## The serial console rejects my key
 
@@ -157,6 +170,35 @@ In order:
    Key-only auth means this is survivable while you fix things.
 3. **Rebuild.** Everything here is declared; `tofu apply -replace=oci_core_instance.main`
    gets you a fresh box. This is only cheap if you were not storing state on it.
+
+## kubectl hangs forever and never returns
+
+Not refused — **hangs**, which is the tell. The Kubernetes API on 6443 is not open to the
+internet (only SSH is), so packets are dropped rather than rejected and there is no error to
+read.
+
+You need the SSH tunnel:
+
+```bash
+ssh -N -L 6443:127.0.0.1:6443 ubuntu@<ip> &
+```
+
+…and the kubeconfig's `server:` must stay `https://127.0.0.1:6443`. **Do not rewrite it to
+the public IP** — the port is closed, and k3s's API certificate carries a `127.0.0.1` SAN,
+not your public address, so even an open port would fail TLS verification.
+
+`./scripts/connect.sh` (or `connect.ps1`) does all of this for you.
+
+Confirm what is reachable:
+
+```bash
+nc -vz <ip> 22      # succeeds
+nc -vz <ip> 6443    # times out — this is correct
+```
+```powershell
+Test-NetConnection <ip> -Port 22      # True
+Test-NetConnection <ip> -Port 6443    # False — this is correct
+```
 
 ## kubectl says the connection is refused
 
@@ -198,6 +240,16 @@ Confirm what it is actually pointed at:
 ```bash
 kubectl -n argocd get application root -o jsonpath='{.spec.source}' | jq
 ```
+
+## `access.api.error.not_enabled` during apply
+
+**Cloudflare Zero Trust Access is switched off on your account.** It is an account feature
+that Terraform cannot enable, and the 403 makes it look like your API token lacks a
+permission. The token is fine.
+
+Enable it once at <https://one.dash.cloudflare.com> — it asks you to pick a team domain —
+then re-run `tofu apply`. Everything already created stays; the apply continues from where
+it stopped.
 
 ## My pod says `exec format error`
 
@@ -241,13 +293,15 @@ kubectl -n argocd get application root -o jsonpath='{.spec.source.repoURL}'
 If that is **not your repo**, your push went somewhere Argo has never looked. Out of the box
 it points at this project, and pointing it at yours is [rung 3](rung-3-your-app.md).
 
-Note `gitops_repo_url` is baked into cloud-init, which runs **once at first boot** — changing
-it in `terraform.tfvars` afterwards does nothing to a running box. Edit the live object
-instead:
+`gitops_repo_url` is baked into cloud-init, which runs **once at first boot** — changing it
+in `terraform.tfvars` afterwards does nothing to a running box. Repoint it with:
 
 ```bash
-kubectl -n argocd edit application root
+./scripts/set-gitops-repo.sh https://github.com/you/your-repo.git
 ```
+
+That edits the box's copy of the root Application and kicks the bootstrap timer, which
+re-applies it. Update `terraform.tfvars` too, so a **rebuild** uses the same value.
 
 ## Argo shows an app as OutOfSync forever
 

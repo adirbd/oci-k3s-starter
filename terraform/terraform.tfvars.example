@@ -13,13 +13,18 @@ region = "eu-frankfurt-1"
 compartment_ocid = "ocid1.tenancy.oc1..aaaa_REPLACE_ME"
 
 # CONTENT, not a path. This is your only way in until you set up something better.
-ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
-# ...or read it from disk. pathexpand() rather than a bare "~/..." — on Windows there is
-# no ~ convention, and pathexpand resolves the user's home on every platform:
-# ssh_public_key = file(pathexpand("~/.ssh/id_ed25519.pub"))
 #
-# Windows, if you have not made a key yet:  ssh-keygen -t ed25519
-# it lands in C:\Users\<you>\.ssh\id_ed25519.pub
+# ⚠ PASTE THE KEY ITSELF. A .tfvars file holds literal values only — FUNCTION CALLS ARE NOT
+# ALLOWED HERE, so `file(...)` or `pathexpand(...)` fails to parse before anything runs:
+#     Error: Function calls not allowed ... Functions may not be called here.
+# (An earlier version of this file suggested exactly that. Reported as #8.)
+#
+# Print your key and paste the output:
+#     macOS / Linux / WSL   cat ~/.ssh/id_ed25519.pub
+#     Windows PowerShell    Get-Content ~\.ssh\id_ed25519.pub
+#
+# No key yet?  ssh-keygen -t ed25519
+ssh_public_key = "ssh-ed25519 AAAAC3Nza... you@laptop"
 
 # The profile `oci session authenticate` created. It PROMPTS you for a name, and whatever
 # you typed goes here. Only leave this out if you accepted the literal name DEFAULT —
