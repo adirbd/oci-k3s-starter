@@ -45,6 +45,7 @@ jobs:
               argocd_version   = "v3.2.0"
               gitops_repo_url  = "https://example.com/repo.git"
               gitops_repo_path = "kubernetes/applications"
+              clustersecretstore = "" # rendered by instance.tf when enable_vault is true
             })
           }
           EOF
