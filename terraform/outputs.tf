@@ -128,3 +128,9 @@ output "vault_secret_names" {
     var.enable_cloudflare ? oci_vault_secret.cloudflared_token[0].secret_name : "",
   ]) : []
 }
+
+output "grafana_admin_password" {
+  description = "Grafana's admin password, generated rather than admin/admin. Read it with `tofu output -raw grafana_admin_password`. The user is `admin`."
+  value       = random_password.grafana_admin.result
+  sensitive   = true
+}

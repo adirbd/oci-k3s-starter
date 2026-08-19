@@ -71,6 +71,25 @@ write_files:
           syncOptions:
             - CreateNamespace=true
 
+  # Grafana's admin credentials, delivered to the cluster rather than left at admin/admin.
+  #
+  # ⚠ THIS PUTS THE PASSWORD IN INSTANCE METADATA, which anything running ON the box can
+  # read via 169.254.169.254. That is a real exposure and worth stating plainly — but it is
+  # the same audience that can already read the Kubernetes Secret directly, so it does not
+  # widen who can see it. It is not visible from outside the instance.
+  - path: /etc/k3s-starter/grafana-admin.yaml
+    permissions: "0600"
+    content: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: grafana-admin
+        namespace: observability
+      type: Opaque
+      stringData:
+        admin-user: admin
+        admin-password: "${grafana_admin_password}"
+
   # Empty unless enable_vault = true — instance.tf passes "" and this stays a blank file
   # the bootstrap skips.
   - path: /etc/k3s-starter/clustersecretstore.yaml
@@ -156,6 +175,14 @@ write_files:
       # scripts/set-gitops-repo.sh does exactly that for you.
       log "asserting the root application"
       kubectl apply -f /etc/k3s-starter/root-application.yaml
+
+      # ── Grafana's password ───────────────────────────────────────────────────────
+      # Applied every run, before Argo installs Grafana: the chart is configured with
+      # admin.existingSecret, so the Secret has to exist or the pod waits for it. Creating
+      # the namespace here is harmless — Argo creates it too, and both are idempotent.
+      log "asserting the Grafana admin secret"
+      kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+      kubectl apply -f /etc/k3s-starter/grafana-admin.yaml
 
       # ── the vault store, when rung 4 is on ───────────────────────────────────────
       # Applied here rather than by hand (#12). External Secrets needs a ClusterSecretStore

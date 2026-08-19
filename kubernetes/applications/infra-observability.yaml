@@ -97,9 +97,19 @@ spec:
           persistence:
             enabled: false
 
-          # ⚠ CHANGE THIS, or put Cloudflare Access in front of it at rung 2.
-          # It is admin/admin until you do.
-          adminPassword: admin
+          # NOT admin/admin, and nothing for you to invent or remember.
+          #
+          # Terraform generates a password, cloud-init delivers it as the `grafana-admin`
+          # Secret before Argo installs this chart, and you read it with:
+          #     tofu output -raw grafana_admin_password
+          #
+          # A rebuild produces the SAME password, because it lives in Terraform state rather
+          # than in someone's head — which is the failure the old default caused: log in with
+          # admin/admin, change it, forget it, reinstall Grafana to get back in.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
 
           sidecar:
             dashboards:
