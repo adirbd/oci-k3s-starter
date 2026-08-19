@@ -162,6 +162,11 @@ stack and a confusing error.
 Turn it on at **<https://one.dash.cloudflare.com>** — it asks you to choose a team domain
 (something like `yourname.cloudflareaccess.com`). That is the whole step.
 
+New accounts also get **Cloudflare's own identity provider** switched on at the same time,
+so logging in later means signing in with the Cloudflare account you already have — no
+Google Cloud project, no third-party setup. See
+[how you actually log in](#how-you-actually-log-in) if you want something else.
+
 ## 3. Turn it on
 
 ```hcl
@@ -300,9 +305,40 @@ Three settings here came from a real outage rather than a preference:
   failure on any non-simple request.
 - **`http_only_cookie_attribute`** — the session cookie should not be readable by page JS.
 
-> **Pin your identity provider.** If One-Time-PIN is enabled account-wide, anyone who can
-> receive mail at an allowed address can log in. Fine for you; think about it before adding
-> a whole domain to the allowlist.
+### How you actually log in
+
+Access checks *who you are* before the request reaches your cluster — but something has to
+vouch for that. You have three options, and **the default needs nothing outside Cloudflare**.
+
+**Cloudflare (the default, and what to use)**
+Since mid-2026, new Zero Trust accounts get **Cloudflare itself** as the identity provider.
+You sign in with the Cloudflare account you already have, backed by its own MFA. Nothing to
+configure, nowhere else to go, and there is a *Restrict to account members* option that
+limits logins to people on your account. If you are reading this on a fresh account, this is
+already switched on.
+
+**One-time PIN**
+Access emails a code to any address on your allowlist. Also no setup, but weaker in a
+specific way: **anyone who can read that mailbox can log in.** Fine for yourself; think
+before adding a whole domain.
+
+**Google, GitHub, Okta, and the rest — genuinely more work, and outside this repo**
+These are *federated* logins, which means creating an application on the other side and
+handing Cloudflare its client ID and secret.
+
+⚠ **Google specifically requires a Google Cloud project.** You create an OAuth 2.0 client in
+the Google Cloud console, configure a consent screen, and add Cloudflare's callback URL. It
+works well and it is a different product with its own concepts — which is why this guide
+does not walk through it. **GitHub is markedly less work** if you want federated login: an
+OAuth App is a handful of fields in your GitHub settings, no project and no consent screen,
+and you already have an account since you forked this repo.
+
+Cloudflare's own docs are the right place for either:
+<https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/>
+
+> **The practical advice:** start with the Cloudflare provider, because it costs you nothing
+> and is stronger than emailed codes. Move to Google or GitHub when you want other people
+> logging in with an identity they already manage — not before.
 
 ## Rolling back
 
