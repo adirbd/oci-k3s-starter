@@ -87,10 +87,14 @@ spec:
                     href: https://grafana.danieliyahu.com
 
             - Your apps:
-                - Daniel's Website:
-                    description: personal site
-                    icon: globe
-                    href: https://www.danieliyahu.com
+                - Argo CD:
+                    description: deploys — what Git says should be running
+                    icon: argo-cd
+                    href: https://argocd.danieliyahu.com
+                - Grafana:
+                    description: metrics — the box, the cluster, your app
+                    icon: grafana
+                    href: https://grafana.danieliyahu.com
 
           widgets:
             - kubernetes:
