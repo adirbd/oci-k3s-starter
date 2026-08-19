@@ -194,7 +194,7 @@ variable "argocd_version" {
 variable "gitops_repo_url" {
   description = "Repo Argo CD watches. Defaults to this project (public), so the first apply deploys a working sample with no credentials. ⚠ When you point this at YOUR repo: Argo gets no credentials at first boot, so a private repo needs a step — see docs/rung-3-your-app.md."
   type        = string
-  default     = "https://github.com/adirbd/oci-k3s-starter.git"
+  default     = "https://github.com/danieliyahu1/oci-k3s-starter.git"
 }
 
 variable "gitops_repo_path" {
