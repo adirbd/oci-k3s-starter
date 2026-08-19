@@ -51,9 +51,18 @@ the node's ports directly — no cloud load balancer, and nothing to pay for.
 **3. Point something at your app**
 
 ```bash
-kubectl get svc -n traefik          # EXTERNAL-IP should be your public IP
-curl http://<your-ip>               # 404 from Traefik = it is working, nothing routed yet
+kubectl get svc -n traefik
+curl http://<your-public-ip>        # 404 from Traefik = it works, nothing is routed yet
 ```
+
+> ⚠ **`EXTERNAL-IP` will show a `10.x` address, and that is correct.** On OCI the public
+> address is 1:1 NAT at the network level — it never appears on the instance's interface —
+> so k3s reports the node's private IP. It looks like the load balancer failed. It has not:
+> curl the **public** address and Traefik answers.
+>
+> If you would rather k3s knew its public address (some charts read it), reinstall with
+> `--node-external-ip $(curl -s http://169.254.169.254/opc/v2/instance/ -H 'Authorization: Bearer Oracle' | jq -r .metadata.public_ip)`.
+> Not required for anything here.
 
 Then give your app an Ingress:
 
