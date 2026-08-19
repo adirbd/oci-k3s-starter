@@ -92,7 +92,8 @@ resource "cloudflare_dns_record" "tunnel" {
 # for you is locking you out of your own Grafana.
 #
 # ⚠ WITH NO EMAILS LISTED, YOUR HOSTNAMES ARE PUBLIC. The tunnel closes your ports; it
-# does not ask who is knocking. Grafana ships admin/admin.
+# does not ask who is knocking — everything behind it sits on the open internet with
+# nothing but its own login page.
 
 resource "cloudflare_zero_trust_access_policy" "members" {
   count = var.enable_cloudflare && length(var.access_allowed_emails) > 0 ? 1 : 0
