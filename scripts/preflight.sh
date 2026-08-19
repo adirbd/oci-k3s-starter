@@ -63,6 +63,9 @@ emails=$(grep -cE '^\s*access_allowed_emails' terraform.tfvars 2>/dev/null)
 if [ "${enabled:-0}" -gt 0 ] && [ "${emails:-0}" -gt 0 ]; then
     acct=$(grep -E '^\s*cf_account_id' terraform.tfvars | sed 's/.*=[[:space:]]*"\(.*\)".*/\1/')
     tok="${TF_VAR_cf_api_token:-$(grep -E '^\s*cf_api_token' terraform.tfvars 2>/dev/null | sed 's/.*=[[:space:]]*"\(.*\)".*/\1/')}"
+    # CLOUDFLARE_API_TOKEN is the provider's own variable and what the docs recommend —
+    # mirror the provider's order: the terraform variable first, then its native env var.
+    tok="${tok:-${CLOUDFLARE_API_TOKEN:-}}"
     if [ -n "$acct" ] && [ -n "$tok" ]; then
         body=$(curl -s -H "Authorization: Bearer $tok" \
             "https://api.cloudflare.com/client/v4/accounts/$acct/access/apps" 2>/dev/null)
