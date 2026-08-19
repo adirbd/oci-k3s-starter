@@ -28,6 +28,17 @@
   // The Argo CD `Application` manifests. NOT the default path for this manager — its
   // default only matches `argocd/**`, so without this every chart pin here would be
   // invisible and the file would still look correctly configured.
+  // examples/ is a TEMPLATE people copy into their own repo, and the default
+  // github-actions manager only scans .github/workflows — so without this the example
+  // silently rots and hands newcomers a workflow that is majors behind. Found exactly
+  // that: every action in it was one major behind on the day it was written.
+  'github-actions': {
+    managerFilePatterns: [
+      '/^\\.github/workflows/.+\\.ya?ml$/',
+      '/^examples/.+\\.ya?ml$/',
+    ],
+  },
+
   // Both directories. kubernetes/optional holds apps that are not deployed by default —
   // the tunnel connector, Traefik, External Secrets — and "not deployed yet" is exactly how
   // a pin gets forgotten until someone copies a two-year-old chart into their cluster.
