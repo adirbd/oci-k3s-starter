@@ -15,7 +15,12 @@ terraform {
   #      a laptop plus CI, is how state gets corrupted.
   #
   # When you outgrow it, uncomment this and run `tofu init -migrate-state`. Any
-  # S3-compatible store works — Cloudflare R2, Backblaze B2, or real S3:
+  # S3-compatible store works — and the one you already have is OCI Object Storage:
+  # Always Free includes 20 GB and it speaks S3, so state can live in the same account as
+  # the box with no new vendor. Cloudflare R2 and Backblaze B2 work identically.
+  #
+  # Worked example, including the Customer Secret Key step and OpenTofu's state encryption:
+  #   docs/state-and-credentials.md
   #
   # backend "s3" {
   #   bucket                      = "your-bucket"
