@@ -176,6 +176,11 @@ tofu output -raw cloudflared_secret_command   # then run what it prints
 It creates the namespace and the Secret in one go, piping the token from Terraform
 straight into `kubectl`. The token never lands in a file or your shell history.
 
+> This Secret is created **by hand**, which means a rebuilt cluster no longer has it and the
+> connector CrashLoops until you re-run the command. [Rung 4](rung-4-secrets.md#what-rungs-2-and-4-do-together)
+> removes that step entirely — the token goes to OCI Vault and the cluster fetches it
+> itself. Worth doing if this box is meant to be disposable.
+
 ## 4. Deploy the connector
 
 It ships in `kubernetes/optional/`, which Argo does **not** watch — otherwise every rung-1
