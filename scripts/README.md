@@ -32,6 +32,8 @@ cannot run before pushing is a check that wastes your time.
 |---|---|
 | `check-apps.py` | renders every Argo Application's chart and asserts facts about the output |
 | `check-dup-keys.py` | duplicate YAML keys, including inside embedded Helm values |
+| `check-image-arch.py` | every image the charts pull has a `linux/arm64` build |
+| `check-argocd-manifest.py` | the Argo CD install manifest can actually be applied |
 | `check-links.py` | relative links in the docs resolve |
 
 ```bash

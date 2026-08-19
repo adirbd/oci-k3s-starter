@@ -110,6 +110,12 @@ jobs:
       - name: applications render, and say what they should
         run: python3 scripts/check-apps.py
 
+      # Oracle's free tier is Ampere. rung 3 warns users at length that an amd64 image dies
+      # with `exec format error` — the repo's own stack has to meet the same bar, and a
+      # chart bump can introduce an amd64-only image silently.
+      - name: every image has an arm64 build
+        run: python3 scripts/check-image-arch.py
+
   scripts:
     name: scripts
     runs-on: ubuntu-latest
