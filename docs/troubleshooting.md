@@ -241,6 +241,16 @@ Confirm what it is actually pointed at:
 kubectl -n argocd get application root -o jsonpath='{.spec.source}' | jq
 ```
 
+## `access.api.error.not_enabled` during apply
+
+**Cloudflare Zero Trust Access is switched off on your account.** It is an account feature
+that Terraform cannot enable, and the 403 makes it look like your API token lacks a
+permission. The token is fine.
+
+Enable it once at <https://one.dash.cloudflare.com> — it asks you to pick a team domain —
+then re-run `tofu apply`. Everything already created stays; the apply continues from where
+it stopped.
+
 ## My pod says `exec format error`
 
 **Your image is the wrong architecture.** Oracle's free tier is Ampere — **aarch64** — and

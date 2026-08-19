@@ -142,7 +142,26 @@ The token needs:
 - **Account → Cloudflare Tunnel → Edit**
 - **Account → Access: Apps and Policies → Edit** (only if you want the login)
 
-## 2. Turn it on
+## 2. Enable Access on your account — once, in a browser
+
+**Only if you are setting `access_allowed_emails`** (you should be), and **only the first
+time.**
+
+Zero Trust Access is an account feature that starts switched off. Terraform cannot turn it
+on, so the first apply that creates an Access policy fails like this:
+
+```
+403 code 9999: access.api.error.not_enabled: Access is not enabled.
+```
+
+It reads like a token permissions problem. It is not — the token is fine, the feature is
+off. Worse, everything else applies successfully first, so you are left with a half-built
+stack and a confusing error.
+
+Turn it on at **<https://one.dash.cloudflare.com>** — it asks you to choose a team domain
+(something like `yourname.cloudflareaccess.com`). That is the whole step.
+
+## 3. Turn it on
 
 ```hcl
 # terraform.tfvars
@@ -164,24 +183,41 @@ $env:TF_VAR_cf_api_token = "..."
 tofu apply
 ```
 
+> The variable lives in your **shell**, for the length of that session. This repo has no
+> `.env` convention and nothing here reads one — if you put the token in a file, no script
+> will load it and the apply will fail on authentication. Set it in the shell, or put it in
+> `terraform.tfvars` (which is gitignored) if you would rather not retype it.
+
 That creates the tunnel, its routing, a proxied CNAME per hostname, and — if you listed
 emails — a Cloudflare Access application in front of each one.
 
-## 3. Give the connector its token
+## 4. Give the connector its token
 
 ```bash
-tofu output -raw cloudflared_secret_command   # then run what it prints
+tofu output -raw cloudflared_secret_command           # macOS, Linux, WSL
+```
+```powershell
+tofu output -raw cloudflared_secret_command_windows   # Windows PowerShell
 ```
 
-It creates the namespace and the Secret in one go, piping the token from Terraform
-straight into `kubectl`. The token never lands in a file or your shell history.
+Then run what it prints. It creates the namespace and the Secret in one go.
+
+> **Why two outputs.** The Unix form pipes the token through `/dev/stdin`, which does not
+> exist on Windows — running it verbatim there fails with "no such file or directory". The
+> PowerShell form passes the token through a variable instead, which is briefly visible to
+> anything listing processes. That is an acceptable trade on your own laptop, and a good
+> reason to prefer the next paragraph.
+
+> **Or skip this step entirely.** [Rung 4](rung-4-secrets.md#what-rungs-2-and-4-do-together)
+> puts the token in OCI Vault and has the cluster fetch it — no secret on your laptop, no
+> platform-specific command, and it survives a rebuild. This hand-made Secret does not.
 
 > This Secret is created **by hand**, which means a rebuilt cluster no longer has it and the
 > connector CrashLoops until you re-run the command. [Rung 4](rung-4-secrets.md#what-rungs-2-and-4-do-together)
 > removes that step entirely — the token goes to OCI Vault and the cluster fetches it
 > itself. Worth doing if this box is meant to be disposable.
 
-## 4. Deploy the connector
+## 5. Deploy the connector
 
 It ships in `kubernetes/optional/`, which Argo does **not** watch — otherwise every rung-1
 user would get a CrashLooping pod for a tunnel they never set up.

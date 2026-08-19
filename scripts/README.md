@@ -6,6 +6,7 @@ Two kinds of thing live here. **Only the first is for you.**
 
 | | |
 |---|---|
+| `preflight.sh` / `.ps1` | check tools, tfvars, OCI session and Cloudflare Access before applying |
 | `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
 | `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
 
