@@ -251,6 +251,39 @@ Enable it once at <https://one.dash.cloudflare.com> — it asks you to pick a te
 then re-run `tofu apply`. Everything already created stays; the apply continues from where
 it stopped.
 
+## A pod says `CreateContainerConfigError` after pulling a new version
+
+It is referring to a Secret or ConfigMap that does not exist on your box.
+
+**Why it happens.** Some things are delivered by **cloud-init**, which runs *once, at first
+boot*. If you pull a version of this repo that adds one — a new Secret, a new file under
+`/etc/k3s-starter/` — your Terraform apply succeeds, the chart starts expecting it, and your
+already-running box never received it. The apply is green and the failure is in pod status.
+
+Find out what is missing:
+
+```bash
+kubectl -n <namespace> describe pod <pod> | tail -20
+```
+
+**Fix it in place** — the safe option, and usually a one-liner. For the `grafana-admin`
+Secret, for example:
+
+```bash
+kubectl -n observability create secret generic grafana-admin   --from-literal=admin-user=admin   --from-literal=admin-password="$(cd terraform && tofu output -raw grafana_admin_password)"
+```
+
+**Or rebuild the box**, which re-runs cloud-init from scratch and picks up everything:
+
+```bash
+tofu apply -replace=oci_core_instance.main
+```
+
+> ⚠ **Rebuilding is not free on a free tier.** `-replace` destroys the instance before
+> creating the new one, and Ampere capacity is not reserved — you may not get one back for
+> hours. Prefer fixing in place, and rebuild only when you were willing to lose the box
+> anyway. See [Updating](../README.md#updating).
+
 ## My pod says `exec format error`
 
 **Your image is the wrong architecture.** Oracle's free tier is Ampere — **aarch64** — and
