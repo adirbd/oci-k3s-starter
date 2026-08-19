@@ -134,8 +134,12 @@ Also set `oci_config_profile` to the profile name from step 2 if you did not cal
 
 ```bash
 tofu init
+./scripts/preflight.sh      # or preflight.ps1 — 10 seconds, saves 20 minutes
 tofu apply
 ```
+
+The preflight checks the things that otherwise fail *late*: a tfvars that will not parse, an
+expired OCI session, missing tools. Each failure names its cause and its fix.
 
 ### ⚠ Expect "Out of host capacity" on your first try
 
