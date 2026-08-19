@@ -69,9 +69,27 @@ Order matters — the CRDs must exist before the store, and the store before any
 `ExternalSecret` that uses it.
 
 ```bash
+kubectl apply -f kubernetes/optional/app-external-secrets.yaml
+```
+
+That works immediately and needs no fork — Argo CD manages the app from the moment the
+object exists, whoever created it.
+
+**The durable way** is to have Argo read it from Git, which needs the repo Argo watches to
+be *yours* — that is [rung 3](rung-3-your-app.md). Once it is:
+
+```bash
 cp kubernetes/optional/app-external-secrets.yaml kubernetes/applications/
 git commit -am "add external secrets" && git push
-# wait for Argo to report Healthy, then:
+```
+
+> ⚠ Do not run the second form before rung 3. Out of the box `gitops_repo_url` points at
+> **this** project, so a push goes somewhere Argo is not watching — or fails outright — and
+> the symptom is simply nothing happening.
+
+Then, once Argo reports it Healthy:
+
+```bash
 tofu output -raw clustersecretstore_manifest | kubectl apply -f -
 ```
 

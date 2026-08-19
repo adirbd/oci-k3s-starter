@@ -178,9 +178,23 @@ It ships in `kubernetes/optional/`, which Argo does **not** watch — otherwise 
 user would get a CrashLooping pod for a tunnel they never set up.
 
 ```bash
+kubectl apply -f kubernetes/optional/app-cloudflared.yaml
+```
+
+That works immediately and needs no fork — Argo CD manages the app from the moment the
+object exists, whoever created it.
+
+**The durable way** is to have Argo read it from Git, which needs the repo Argo watches to
+be *yours* — that is [rung 3](rung-3-your-app.md). Once it is:
+
+```bash
 cp kubernetes/optional/app-cloudflared.yaml kubernetes/applications/
 git commit -am "enable the tunnel" && git push
 ```
+
+> ⚠ Do not run the second form before rung 3. Out of the box `gitops_repo_url` points at
+> **this** project, so a push goes somewhere Argo is not watching — or fails outright — and
+> the symptom is simply nothing happening.
 
 Argo picks it up within a few minutes. Then:
 

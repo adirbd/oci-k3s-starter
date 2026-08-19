@@ -54,4 +54,13 @@ page. Both shapes are accepted by Homepage; only the list survives Helm.
 Copy `app-sample.yaml`, change the source, commit. Argo picks it up within a few minutes,
 or immediately if you hit Refresh in the UI.
 
-For a private repo you need credentials — see [../docs/rung-3-your-app.md](../docs/rung-3-your-app.md).
+> ⚠ **Committing only does something once Argo is watching YOUR repo.** Out of the box
+> `gitops_repo_url` points at this project, so a push lands somewhere Argo is not looking
+> and nothing happens — with no error to explain it. Point it at your own repo first
+> ([rung 3](../docs/rung-3-your-app.md)), or apply a file directly while you experiment:
+>
+> ```bash
+> kubectl apply -f kubernetes/optional/app-traefik.yaml
+> ```
+>
+> Argo manages the app either way; only the source of truth differs.
