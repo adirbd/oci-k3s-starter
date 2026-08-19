@@ -1,0 +1,465 @@
+# ONE dashboard that answers the questions people actually have.
+#
+# WHY THIS EXISTS. The chart's own dashboards are node-exporter-full (roughly two hundred
+# panels of host metrics) and two about VictoriaMetrics itself. All three are legitimate and
+# none of them answers "what is running, and how is my app doing" — so the first person to
+# open Grafana on a fresh box reported seeing a lot of dashboards and nothing useful.
+#
+# Eight panels: the four numbers worth a glance, CPU and memory by pod, anything not
+# Running, and recent restarts. It is set as Grafana's HOME dashboard, so opening Grafana
+# lands here rather than on a directory listing.
+#
+# The label is what matters: the Grafana sidecar watches for grafana_dashboard: "1" and
+# imports anything wearing it. Add your own the same way.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-your-cluster
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  your-cluster.json: |
+    {
+      "title": "Your cluster",
+      "uid": "your-cluster",
+      "tags": [
+        "starter"
+      ],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "editable": true,
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "CPU used",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Memory used",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Disk used",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Pods running",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "count(kube_pod_status_phase{phase=\"Running\"} == 1)",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "CPU by pod",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (pod) (rate(container_cpu_usage_seconds_total{container!=\"\",container!=\"POD\"}[5m])))",
+              "legendFormat": "{{pod}}",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 10,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Memory by pod",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (pod) (container_memory_working_set_bytes{container!=\"\",container!=\"POD\"}))",
+              "legendFormat": "{{pod}}",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "fillOpacity": 10,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "type": "table",
+          "title": "Pods not running",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 12
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"} == 1",
+              "format": "table",
+              "instant": true,
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true,
+                  "__name__": true,
+                  "job": true,
+                  "instance": true,
+                  "uid": true,
+                  "container": true,
+                  "endpoint": true,
+                  "service": true
+                }
+              }
+            }
+          ],
+          "description": "Empty is good. Anything here is Pending, Failed or CrashLooping."
+        },
+        {
+          "type": "timeseries",
+          "title": "Restarts in the last hour",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 12
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "targets": [
+            {
+              "expr": "topk(10, increase(kube_pod_container_status_restarts_total[1h]))",
+              "legendFormat": "{{pod}}",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 10,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "description": "The eight numbers worth looking at. Everything else is one click away in the other dashboards."
+    }

@@ -242,6 +242,20 @@ Change that password and delete the Secret once you are in.
 
 ---
 
+## What to look at in Grafana
+
+It opens on **Your cluster** — eight panels: CPU, memory and disk on the box, how many pods
+are running, CPU and memory by pod, anything *not* running, and recent restarts. That is
+deliberately small; it is the set that answers "is everything fine, and if not, what."
+
+The other dashboards are still there under **Dashboards**. `Node Exporter Full` has roughly
+two hundred panels and is the right tool when you have a specific question about the host —
+and the wrong first impression, which is why it is not the landing page.
+
+To add your own: create a ConfigMap in the `observability` namespace with the label
+`grafana_dashboard: "1"` and your dashboard JSON inside. The sidecar imports it within a
+minute. `kubernetes/manifests/dashboard/` is a worked example.
+
 ## What just happened
 
 ```
