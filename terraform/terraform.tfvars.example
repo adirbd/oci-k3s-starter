@@ -38,8 +38,10 @@ oci_config_profile = "DEFAULT"
 # after you have actually used it once.
 # ssh_allowed_cidr = "203.0.113.4/32"
 
-# Point Argo CD at your own repo (rung 3). Defaults to this project's sample.
-# gitops_repo_url  = "https://github.com/you/your-cluster.git"
+# Point Argo CD at your own repo. If you know you want this, SET IT NOW: the value is
+# baked into cloud-init at first boot, so changing it later does not move a running
+# cluster — you have to edit the live Application. Fork this repo, then:
+# gitops_repo_url  = "https://github.com/you/oci-k3s-starter.git"
 # gitops_repo_path = "kubernetes/applications"
 
 # ── Rung 2: Cloudflare. Leave false and everything still works. ───────────────────

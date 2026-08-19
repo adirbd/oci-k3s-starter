@@ -6,6 +6,9 @@
 domain. Cloudflare's plan, the tunnel, the certificate, Access, the DDoS protection and the
 CDN are all free; you are paying a registrar for a name, not paying Cloudflare.
 
+> **Bought it through Cloudflare?** Then the nameservers are already pointed and there is
+> nothing to do — skip to step 1.
+>
 > Cloudflare Registrar sells at wholesale with no markup (about $10-11/yr for a `.com` at
 > the time of writing; registrar prices drift), and
 > other TLDs go cheaper — a `.xyz` or `.dev` is often a few dollars. Any registrar works;

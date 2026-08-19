@@ -85,6 +85,19 @@ cp terraform.tfvars.example terraform.tfvars
 Also set `oci_config_profile` to the profile name from step 2 if you did not call it
 `DEFAULT`.
 
+> **Planning to deploy your own app? Fork this repo now and add one more line.**
+>
+> ```hcl
+> gitops_repo_url = "https://github.com/YOU/oci-k3s-starter.git"
+> ```
+>
+> `gitops_repo_url` is baked into cloud-init, which runs **once, at first boot** — setting
+> it later does nothing to a running box, and you have to edit the live Application instead.
+> Two minutes now saves that. Leave it unset if you just want to look around; the default
+> points at this repo and deploys the same sample.
+
+
+
 ## 4. Apply
 
 ```bash
