@@ -185,8 +185,11 @@ tofu apply
 
 > The variable lives in your **shell**, for the length of that session. This repo has no
 > `.env` convention and nothing here reads one — if you put the token in a file, no script
-> will load it and the apply will fail on authentication. Set it in the shell, or put it in
-> `terraform.tfvars` (which is gitignored) if you would rather not retype it.
+> will load it and the apply will fail on authentication.
+>
+> `CLOUDFLARE_API_TOKEN` works too, and is the provider's own convention — see
+> [state and credentials](state-and-credentials.md#your-cloudflare-token) for fetching it
+> from a password manager instead of typing it.
 
 That creates the tunnel, its routing, a proxied CNAME per hostname, and — if you listed
 emails — a Cloudflare Access application in front of each one.
