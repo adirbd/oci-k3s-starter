@@ -134,3 +134,10 @@ output "grafana_admin_password" {
   value       = random_password.grafana_admin.result
   sensitive   = true
 }
+
+output "access_aud_tags" {
+  description = "The AUD tag of each Access application, keyed by hostname. Grafana needs its own to verify Access's JWT — see rung 2, 'Log into Grafana with the same identity'."
+  value = {
+    for k, app in cloudflare_zero_trust_access_application.protected : k => app.aud
+  }
+}
