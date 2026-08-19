@@ -11,6 +11,9 @@ This turns it into a small personal platform: `k3s` for the runtime, **Argo CD**
 One `tofu apply`. No Kubernetes knowledge required to get to the first running app.
 
 ```bash
+git clone https://github.com/adirbd/oci-k3s-starter.git   # or your fork
+cd oci-k3s-starter
+
 oci session authenticate          # browser login, no keys on disk
 cd terraform
 cp terraform.tfvars.example terraform.tfvars   # fill in 3 values
@@ -127,6 +130,7 @@ instance principal — so there is no API key on the server to steal or rotate.
 **Required**
 
 - An **Oracle Cloud account** — the Always Free tier, no card charged
+- **git**, to get these files
 - **[OpenTofu](https://opentofu.org)** (or Terraform)
 - The **[OCI CLI](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm)**, for the browser login
 - **kubectl**, to talk to the cluster once it exists

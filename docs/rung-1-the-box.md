@@ -10,18 +10,19 @@ Git repo, reachable from your laptop.
 
 ## 1. Get the tools
 
-You need three: **OpenTofu** (builds the box), the **OCI CLI** (browser login only), and
-**kubectl** (talks to the cluster).
+Four things: **git** (to get these files), **OpenTofu** (builds the box), the **OCI CLI**
+(browser login only), and **kubectl** (talks to the cluster).
 
 **macOS**
 
 ```bash
-brew install opentofu oci-cli kubernetes-cli
+brew install git opentofu oci-cli kubernetes-cli
 ```
 
 **Windows** — PowerShell, no admin needed for winget
 
 ```powershell
+winget install Git.Git
 winget install OpenTofu.Tofu
 winget install Kubernetes.kubectl
 # the OCI CLI has its own installer:
@@ -29,12 +30,43 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command `
   "iex ((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.ps1'))"
 ```
 
+> ⚠ **Close PowerShell and open a new one afterwards.** `winget` adds these to your PATH,
+> but a shell that is already running does not see it — so `tofu` will report
+> "not recognized" until you restart the terminal. This confuses everybody once.
+
 **Linux**
 
 ```bash
+sudo apt install git   # or your package manager's equivalent
 # OpenTofu: https://opentofu.org/docs/intro/install/
 curl -fsSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash
 ```
+
+Check they all answer:
+
+```bash
+git --version && tofu version && kubectl version --client && oci --version
+```
+
+## 2. Get these files
+
+**If you only want to look around**, clone this repo:
+
+```bash
+git clone https://github.com/adirbd/oci-k3s-starter.git
+cd oci-k3s-starter
+```
+
+**If you plan to deploy your own app — fork first, then clone your fork.** Use the Fork
+button at the top of [the repo](https://github.com/adirbd/oci-k3s-starter), then:
+
+```bash
+git clone https://github.com/YOU/oci-k3s-starter.git
+cd oci-k3s-starter
+```
+
+Forking now rather than later matters: Argo CD is told which repo to watch **at first boot**
+and does not re-read it afterwards. See the note in step 4.
 
 > **Windows users: everything here works in PowerShell**, and every command in these docs
 > that differs is given in both forms. You do **not** need WSL — though if you already have
@@ -45,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/insta
 > PowerShell quoting, and `cmd` handles quotes differently enough to produce confusing
 > errors.
 
-## 2. Log in with a browser
+## 3. Log in with a browser
 
 ```bash
 oci session authenticate
@@ -69,7 +101,7 @@ oci session refresh --profile <name>
 > For CI, where there is no browser, set `oci_auth = "APIKey"` and supply the key —
 > preferably via `TF_VAR_oci_private_key` in the environment rather than a file.
 
-## 3. Fill in three values
+## 4. Fill in three values
 
 ```bash
 cd terraform
@@ -98,7 +130,7 @@ Also set `oci_config_profile` to the profile name from step 2 if you did not cal
 
 
 
-## 4. Apply
+## 5. Apply
 
 ```bash
 tofu init
@@ -128,7 +160,7 @@ domains, which is what actually changes the answer:
 ./scripts/retry-apply.sh            # or retry-apply.ps1 on Windows
 ```
 
-## 5. Get in
+## 6. Get in
 
 **The short way** — fetches the kubeconfig and opens every UI at once:
 
@@ -178,7 +210,7 @@ Watch it:
 ssh ubuntu@<ip> 'sudo journalctl -u k3s-starter-bootstrap -f'
 ```
 
-## 6. Look at Argo CD
+## 7. Look at Argo CD
 
 ```bash
 kubectl -n argocd port-forward svc/argocd-server 8080:443
