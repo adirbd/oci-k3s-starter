@@ -36,7 +36,7 @@ spec:
         # config key is missing. Add your own hostname here at rung 2.
         env:
           - name: HOMEPAGE_ALLOWED_HOSTS
-            value: localhost:3000,homepage.local
+            value: localhost:3000,homepage.local,home.danieliyahu.com
 
         serviceAccount:
           create: true
@@ -80,11 +80,11 @@ spec:
                 - Argo CD:
                     description: deploys — what Git says should be running
                     icon: argo-cd
-                    href: https://localhost:8080
+                    href: https://argocd.danieliyahu.com
                 - Grafana:
                     description: metrics — the box, the cluster, your app
                     icon: grafana
-                    href: http://localhost:3001
+                    href: https://grafana.danieliyahu.com
 
             - Your apps:
                 # podinfo, from app-sample.yaml. Delete this entry when you delete that.
