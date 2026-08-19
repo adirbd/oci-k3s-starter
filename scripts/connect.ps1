@@ -62,7 +62,7 @@ try {
     Write-Host "opening port-forwards (close this window to stop them):"
     Write-Host "  Homepage   http://localhost:3000"
     Write-Host "  Argo CD    https://localhost:8080   (user: admin)"
-    Write-Host "  Grafana    http://localhost:3001    (admin/admin)"
+    Write-Host "  Grafana    http://localhost:3001    (user admin - password below)"
     Write-Host "  podinfo    http://localhost:9898"
     Write-Host ""
 
@@ -72,6 +72,13 @@ try {
         Write-Host "Argo CD password: $([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64)))"
     } else {
         Write-Host "Argo CD password: (secret not created yet)"
+    }
+
+    $g = kubectl -n observability get secret grafana-admin -o jsonpath='{.data.admin-password}' 2>$null
+    if ($g) {
+        Write-Host "Grafana password (user: admin): $([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($g)))"
+    } else {
+        Write-Host "Grafana password: run  tofu output -raw grafana_admin_password"
     }
     Write-Host ""
 

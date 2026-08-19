@@ -56,7 +56,8 @@ Cloudflare and still got attacked" stories start.
 ### 4. A login in front of everything, that you did not write
 
 Cloudflare Access checks identity **before** the request reaches your cluster. Grafana ships
-`admin/admin`; Argo CD holds credentials to your infrastructure. Neither should be answering
+a generated password — but it is still a login on the public internet; Argo CD holds
+credentials to your infrastructure. Neither should be answering
 strangers, and writing your own auth layer for internal tools is a bad use of a weekend.
 
 Adding a collaborator is adding their email address. There are no user accounts on your box

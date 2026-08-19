@@ -52,12 +52,17 @@ echo
 echo "opening port-forwards (ctrl-c to stop everything):"
 echo "  Homepage   http://localhost:3000"
 echo "  Argo CD    https://localhost:8080   (user: admin)"
-echo "  Grafana    http://localhost:3001    (admin/admin)"
+echo "  Grafana    http://localhost:3001    (user admin — password below)"
 echo "  podinfo    http://localhost:9898"
 echo
 echo "Argo CD password:"
 kubectl -n argocd get secret argocd-initial-admin-secret \
     -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "(not created yet)"
+echo
+echo "Grafana password (user: admin):"
+kubectl -n observability get secret grafana-admin \
+    -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d \
+    || echo "(not created yet — or run: tofu output -raw grafana_admin_password)"
 echo; echo
 
 kubectl -n homepage      port-forward svc/homepage 3000:3000        >/dev/null 2>&1 &
