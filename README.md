@@ -165,16 +165,27 @@ worth choosing deliberately.
 
 API-key auth is still supported, and documented for CI, where no browser exists.
 
-## Cost, and the one date that matters
+## Cost, and the limit that bites
 
-Always Free is genuinely free — but Oracle's ARM allowance **drops to 2 cores / 12 GB**
-for accounts created after their trial ends, and **exceeding the allowance deletes every
-ARM instance in your tenancy after 30 days — not just the excess.**
+Always Free is genuinely free. The one thing to understand is the **ARM allowance**, because
+overshooting it is punished far harder than you would expect:
 
-The default here is sized to fit inside the smaller allowance on purpose. See
-[docs/cost-and-limits.md](docs/cost-and-limits.md) for what the stack itself consumes and
-how much is left for your app — the answer is roughly half, and knowing that up front is
-better than learning it from an OOMKill.
+> **Exceeding it disables and then deletes EVERY Ampere instance in your tenancy after 30
+> days — not just the excess.** Nothing fails at the moment you overshoot, so the cause is a
+> month gone by the time the effect arrives.
+
+New accounts get a larger allowance during their **trial** (roughly 30 days from signup) and
+a smaller one afterwards. The defaults here — 2 cores, 12 GB — are sized for the *smaller*
+figure on purpose, so the box survives that transition without you doing anything, and
+`variables.tf` refuses values above it rather than trusting you to remember.
+
+Allowances vary by account and change over time, so check yours rather than trusting any
+guide, including this one: **Governance → Limits, Quotas and Usage**, filtered to
+`VM.Standard.A1.Flex`.
+
+[docs/cost-and-limits.md](docs/cost-and-limits.md) has the rest — what the stack itself
+consumes, and how much is left for your app. The short answer is that the platform costs
+about a quarter of the machine.
 
 ## Keeping it current
 

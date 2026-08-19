@@ -23,6 +23,11 @@ failed apply.
 
 ## The allowance
 
+> ⚠ **Check your own, do not trust this table.** Allowances differ between accounts and
+> Oracle changes them over time; the figures below are what one tenancy actually saw. Yours
+> are in the console under **Governance → Limits, Quotas and Usage**, filtered to
+> `VM.Standard.A1.Flex` — that page is authoritative and this page is not.
+
 | | during the free trial | after it ends |
 |---|---|---|
 | ARM (A1) cores | 4 | **2** |
