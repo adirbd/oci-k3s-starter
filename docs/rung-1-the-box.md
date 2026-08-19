@@ -112,7 +112,7 @@ cp terraform.tfvars.example terraform.tfvars
 |---|---|
 | `region` | top-right in the OCI console. **Must be your home region** — Always Free only exists there, and it is fixed at signup |
 | `compartment_ocid` | Identity → Compartments. Your tenancy OCID (the root compartment) is a fine answer |
-| `ssh_public_key` | `cat ~/.ssh/id_ed25519.pub`, or use `file("~/.ssh/id_ed25519.pub")` |
+| `ssh_public_key` | the key **content**, pasted in — print it with `cat ~/.ssh/id_ed25519.pub`, or `Get-Content ~\.ssh\id_ed25519.pub` on Windows |
 
 Also set `oci_config_profile` to the profile name from step 2 if you did not call it
 `DEFAULT`.
@@ -171,18 +171,27 @@ domains, which is what actually changes the answer:
 ./scripts/connect.ps1           # Windows PowerShell
 ```
 
-**Or by hand.** The kubeconfig on the box points at `127.0.0.1`, which is correct *there*
-and useless from your laptop, so it has to be rewritten:
+### How this reaches the cluster, since nothing is open
+
+The security list opens **one** inbound port: SSH. The Kubernetes API on 6443 is
+deliberately **not** reachable from your laptop — a control plane on the public internet is
+a bad trade for saving a flag.
+
+So `connect.sh` opens an SSH tunnel (`ssh -N -L 6443:127.0.0.1:6443`) and kubectl talks to
+`127.0.0.1:6443` through it. The kubeconfig is used exactly as fetched; its `127.0.0.1` is
+correct, not a mistake to be rewritten.
+
+**Or by hand**, which is the same two moves:
 
 ```bash
-ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml' \
-  | sed 's/127.0.0.1/<ip>/' > kubeconfig
+ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig
 export KUBECONFIG=$PWD/kubeconfig
+ssh -N -L 6443:127.0.0.1:6443 ubuntu@<ip> &      # leave this running
 ```
 ```powershell
-(ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml') -replace '127\.0\.0\.1','<ip>' |
-  Set-Content kubeconfig
+ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml' | Set-Content kubeconfig
 $env:KUBECONFIG = "$PWD\kubeconfig"
+Start-Process ssh -ArgumentList '-N','-L','6443:127.0.0.1:6443',"ubuntu@<ip>"
 ```
 
 ```bash
