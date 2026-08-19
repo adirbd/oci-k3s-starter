@@ -56,10 +56,16 @@ resource "oci_core_security_list" "public" {
 
   # SSH. The ONLY inbound rule by default.
   #
-  # Note what is deliberately NOT here: 80 and 443. You do not need them. At rung 1 you
-  # reach services with `kubectl port-forward` over this SSH connection; at rung 2 the
-  # Cloudflare Tunnel dials OUT, so inbound HTTP is never required. A box with no web
-  # ports open is not an inconvenience, it is the design.
+  # Note what is deliberately NOT here: 80, 443, and 6443.
+  #
+  # ⚠ 6443 MATTERS AND ITS ABSENCE IS LOAD-BEARING. The Kubernetes API is NOT reachable from
+  # the internet, so `kubectl` cannot talk to it directly — scripts/connect.sh forwards it
+  # over THIS ssh connection (`ssh -N -L 6443:127.0.0.1:6443`) and kubectl speaks to
+  # 127.0.0.1. Anyone editing this list should know that opening 6443 instead would put a
+  # control plane on the public internet, and that k3s's API certificate does not even carry
+  # the public address as a SAN.
+  #
+  # 80/443 are equally unnecessary: at rung 2 the Cloudflare Tunnel dials OUT.
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = var.ssh_allowed_cidr
