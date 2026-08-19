@@ -293,13 +293,15 @@ kubectl -n argocd get application root -o jsonpath='{.spec.source.repoURL}'
 If that is **not your repo**, your push went somewhere Argo has never looked. Out of the box
 it points at this project, and pointing it at yours is [rung 3](rung-3-your-app.md).
 
-Note `gitops_repo_url` is baked into cloud-init, which runs **once at first boot** — changing
-it in `terraform.tfvars` afterwards does nothing to a running box. Edit the live object
-instead:
+`gitops_repo_url` is baked into cloud-init, which runs **once at first boot** — changing it
+in `terraform.tfvars` afterwards does nothing to a running box. Repoint it with:
 
 ```bash
-kubectl -n argocd edit application root
+./scripts/set-gitops-repo.sh https://github.com/you/your-repo.git
 ```
+
+That edits the box's copy of the root Application and kicks the bootstrap timer, which
+re-applies it. Update `terraform.tfvars` too, so a **rebuild** uses the same value.
 
 ## Argo shows an app as OutOfSync forever
 

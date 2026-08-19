@@ -81,6 +81,24 @@ resource "oci_core_instance" "main" {
       argocd_version   = var.argocd_version
       gitops_repo_url  = var.gitops_repo_url
       gitops_repo_path = var.gitops_repo_path
+
+      # Rendered here so the box can apply it itself at boot, rather than a human pasting
+      # `tofu output clustersecretstore_manifest` into kubectl — a step that is easy to skip
+      # and does not survive a rebuild (#12). Empty string when rung 4 is off.
+      clustersecretstore = var.enable_vault ? indent(6, yamlencode({
+        apiVersion = "external-secrets.io/v1"
+        kind       = "ClusterSecretStore"
+        metadata   = { name = "oci-vault" }
+        spec = {
+          provider = {
+            oracle = {
+              vault         = oci_kms_vault.main[0].id
+              region        = var.region
+              principalType = "InstancePrincipal"
+            }
+          }
+        }
+      })) : ""
     }))
   }
 

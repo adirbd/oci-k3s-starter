@@ -83,15 +83,19 @@ cp kubernetes/optional/app-external-secrets.yaml kubernetes/applications/
 git commit -am "add external secrets" && git push
 ```
 
+> **The ClusterSecretStore applies itself.** When `enable_vault = true`, Terraform renders it
+> into cloud-init and the box applies it on every bootstrap run — so there is nothing to
+> paste, and a rebuilt cluster gets it back without anyone typing. The
+> `clustersecretstore_manifest` output still exists if you want to inspect or apply it by
+> hand.
+>
+> It is applied on a timer, so if External Secrets is not installed yet the first attempt
+> fails harmlessly and the next run (within 15 minutes) succeeds.
+
 > ⚠ Do not run the second form before rung 3. Out of the box `gitops_repo_url` points at
 > **this** project, so a push goes somewhere Argo is not watching — or fails outright — and
 > the symptom is simply nothing happening.
 
-Then, once Argo reports it Healthy:
-
-```bash
-tofu output -raw clustersecretstore_manifest | kubectl apply -f -
-```
 
 The manifest is generated with your vault OCID and region already in it, so there is
 nothing to paste.
