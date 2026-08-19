@@ -308,8 +308,8 @@ variable "enable_public_http" {
   # this, anything you expose is directly reachable and scanned within minutes, and you own
   # the TLS certificate, the renewals and whatever is listening.
   #
-  # Do NOT combine this with an unauthenticated Grafana (it ships admin/admin) or an
-  # exposed Argo CD, which holds credentials to your infrastructure.
+  # Do NOT combine this with an exposed Argo CD or Grafana: both hold credentials to
+  # your infrastructure, and a login page alone is a thin thing to put on the internet.
 }
 
 variable "public_http_cidr" {

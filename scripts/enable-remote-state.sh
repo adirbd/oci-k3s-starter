@@ -5,9 +5,11 @@
 # create its own storage in a single step. Everyone meets this, and the usual answers are
 # "click around the console first" or "keep a second Terraform project just for the bucket".
 #
-# This does the two stages for you and you never see the seam:
+# This does the whole thing in ONE run and you never see the seam:
 #   1. apply with LOCAL state, creating the bucket and an S3 credential
-#   2. write backend.hcl, then `tofu init -migrate-state` to move state into it
+#   2. write backend.hcl from the outputs
+#   3. add `backend "s3" {}` to versions.tf (empty on purpose — backend.hcl has the values)
+#   4. `tofu init -migrate-state` to move state into the bucket
 #
 # Afterwards the state file lives in your own OCI tenancy, versioned, and your laptop is no
 # longer the only copy.
@@ -16,7 +18,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/../terraform"
 
+TF="${TF:-tofu}"; command -v "$TF" >/dev/null 2>&1 || TF=terraform
+
 need() { grep -qE "^\s*$1\s*=" terraform.tfvars 2>/dev/null; }
+backend_active() { grep -qE '^\s*backend "s3"' versions.tf; }
 
 echo "── checking prerequisites"
 if ! need enable_remote_state; then
@@ -33,42 +38,53 @@ MSG
 fi
 need oci_user_ocid || { echo "  oci_user_ocid is missing from terraform.tfvars — see above."; exit 1; }
 
-echo "── stage 1: creating the bucket and credentials (local state)"
-tofu apply -auto-approve
+# Once the backend is live, everything below either fails (apply against a backend that
+# is not initialised in THIS shell) or is a no-op. Say so instead of half-running.
+if backend_active && [ -f backend.hcl ]; then
+    cat <<MSG
+  remote state looks enabled already: versions.tf declares the backend and backend.hcl
+  exists. Nothing to do. To verify, run (with the AWS_* credentials in the environment):
 
-echo "── stage 2: writing backend.hcl"
-tofu output -raw state_backend_config > backend.hcl
-echo "  wrote terraform/backend.hcl  (gitignored)"
-
-# Uncomment the backend block if it is still commented out. Terraform needs `backend "s3" {}`
-# to exist before -backend-config means anything.
-if ! grep -qE '^\s*backend "s3"' versions.tf; then
+      $TF init -backend-config=backend.hcl && $TF state list
+MSG
+    exit 0
+fi
+if backend_active; then
     cat <<'MSG'
-
-  ⚠ One edit left, and it has to be by hand: versions.tf still has its backend block
-  commented out. Uncomment it, leaving the body EMPTY:
-
-      backend "s3" {}
-
-  The values come from backend.hcl, which is why the block is empty. Then re-run this
-  script — everything before this point is idempotent.
+  versions.tf declares an active `backend "s3"` block but backend.hcl does not exist,
+  so nothing can read the outputs to write it. Comment the block back out and re-run
+  this script — it adds the block itself, at the right moment.
 MSG
     exit 1
 fi
 
-echo "── stage 3: migrating state into the bucket"
-export AWS_ACCESS_KEY_ID="$(tofu output -raw state_s3_access_key_id)"
-export AWS_SECRET_ACCESS_KEY="$(tofu output -raw state_s3_secret_access_key)"
-tofu init -backend-config=backend.hcl -migrate-state
+echo "── stage 1: creating the bucket and credentials (local state)"
+"$TF" apply -auto-approve
 
-cat <<'MSG'
+echo "── stage 2: writing backend.hcl"
+"$TF" output -raw state_backend_config > backend.hcl
+echo "  wrote terraform/backend.hcl  (gitignored)"
+
+# Terraform needs `backend "s3" {}` to exist before -backend-config means anything. The
+# block is EMPTY on purpose — every value comes from backend.hcl — and the commented
+# example further down versions.tf stays as documentation.
+echo "── stage 3: adding backend \"s3\" {} to versions.tf"
+awk '/^terraform {/ && !done { print; print "  backend \"s3\" {}"; done=1; next } { print }' \
+    versions.tf > versions.tf.tmp && mv versions.tf.tmp versions.tf
+
+echo "── stage 4: migrating state into the bucket"
+export AWS_ACCESS_KEY_ID="$("$TF" output -raw state_s3_access_key_id)"
+export AWS_SECRET_ACCESS_KEY="$("$TF" output -raw state_s3_secret_access_key)"
+"$TF" init -backend-config=backend.hcl -migrate-state
+
+cat <<MSG
 
 done. State now lives in your OCI tenancy, versioned.
 
-Every future tofu command needs the credentials in the environment:
+Every future $TF command needs the credentials in the environment:
 
-    export AWS_ACCESS_KEY_ID=$(tofu output -raw state_s3_access_key_id)
-    export AWS_SECRET_ACCESS_KEY=$(tofu output -raw state_s3_secret_access_key)
+    export AWS_ACCESS_KEY_ID=\$($TF output -raw state_s3_access_key_id)
+    export AWS_SECRET_ACCESS_KEY=\$($TF output -raw state_s3_secret_access_key)
 
 ⚠ Those outputs read from the state you just moved, so once your local copy is gone you
 need another source. With rung 4 enabled they are also in OCI Vault as

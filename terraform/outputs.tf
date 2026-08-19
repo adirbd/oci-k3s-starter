@@ -9,8 +9,8 @@ output "ssh" {
 }
 
 output "kubeconfig_command" {
-  description = "Fetch the cluster's kubeconfig to your machine. The sed rewrites the server address from 127.0.0.1 (correct on the box, useless from your laptop) to the public IP."
-  value       = "ssh ubuntu@${oci_core_instance.main.public_ip} 'sudo cat /etc/rancher/k3s/k3s.yaml' | sed 's/127.0.0.1/${oci_core_instance.main.public_ip}/' > kubeconfig && export KUBECONFIG=$PWD/kubeconfig"
+  description = "Fetch the cluster's kubeconfig, unmodified, and open the SSH tunnel kubectl needs. The server stays 127.0.0.1 ON PURPOSE: 6443 is not open to the internet, and the API certificate carries a 127.0.0.1 SAN, so rewriting it to the public IP cannot work (#9). scripts/connect.sh does all of this, plus the port-forwards."
+  value       = "ssh ubuntu@${oci_core_instance.main.public_ip} 'sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig && export KUBECONFIG=$PWD/kubeconfig && ssh -f -N -L 6443:127.0.0.1:6443 ubuntu@${oci_core_instance.main.public_ip}"
 }
 
 output "argocd_password_command" {
@@ -21,12 +21,14 @@ output "argocd_password_command" {
 output "next_steps" {
   description = "What to do once apply finishes."
   value       = <<-EOT
-    1. Fetch kubeconfig:   see the `kubeconfig_command` output
+    1. Get in:             ../scripts/connect.sh   (connect.ps1 on Windows)
+                           It fetches the kubeconfig, opens the SSH tunnel — the only
+                           way in; 6443 is deliberately closed — and port-forwards
+                           every UI. By hand instead: the `kubeconfig_command` output.
     2. Watch it come up:   kubectl get pods -A -w
        (the bootstrap timer runs every 15 min, so a slow first boot catches up on its own)
-    3. Argo CD UI:         kubectl -n argocd port-forward svc/argocd-server 8080:443
-                           then https://localhost:8080  (user: admin)
-    4. Password:           see the `argocd_password_command` output
+    3. Argo CD UI:         https://localhost:8080  (user: admin — connect.sh opened it)
+    4. Password:           connect.sh prints it, or see `argocd_password_command`
 
     Add real hostnames instead of port-forward: docs/rung-2-real-urls.md
   EOT

@@ -9,7 +9,7 @@ Two kinds of thing live here. **Only the first is for you.**
 | `preflight.sh` / `.ps1` | check tools, tfvars, OCI session and Cloudflare Access before applying |
 | `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
 | `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
-| `set-gitops-repo.sh` | point Argo CD at a different repo on a running box |
+| `set-gitops-repo.sh` | point Argo CD at a different repo — the root app on the running box, and the child Applications in this checkout |
 | `enable-remote-state.sh` | move Terraform state off your laptop into your own OCI bucket |
 
 ```bash

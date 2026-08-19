@@ -15,6 +15,9 @@
 set -uo pipefail
 cd "$(dirname "$0")/../terraform" || exit 1
 
+# OpenTofu or Terraform — both are supported. Set TF=terraform to force it.
+TF="${TF:-tofu}"; command -v "$TF" >/dev/null 2>&1 || TF=terraform
+
 fail=0
 ok()   { printf "  \033[32mOK\033[0m    %s\n" "$1"; }
 bad()  { printf "  \033[31mFAIL\033[0m  %s\n" "$1"; fail=1; }
@@ -23,7 +26,7 @@ warn() { printf "  WARN  %s\n" "$1"; }
 echo "preflight:"
 
 # ── tools ────────────────────────────────────────────────────────────────────
-for t in tofu kubectl oci git; do
+for t in "$TF" kubectl oci git; do
     command -v "$t" >/dev/null 2>&1 && ok "$t installed" \
         || bad "$t not found. On Windows, close and reopen your terminal after winget — PATH is only picked up by new shells."
 done
@@ -32,7 +35,7 @@ done
 if [ ! -f terraform.tfvars ]; then
     bad "terraform/terraform.tfvars does not exist. Copy terraform.tfvars.example to it."
 else
-    out=$(tofu validate -no-color 2>&1)
+    out=$("$TF" validate -no-color 2>&1)
     if [ $? -eq 0 ]; then
         ok "terraform config and tfvars parse"
     else
@@ -44,7 +47,9 @@ else
 fi
 
 # ── the OCI session is alive ─────────────────────────────────────────────────
-profile=$(grep -E '^\s*oci_config_profile' terraform.tfvars 2>/dev/null | sed 's/.*=\s*"\(.*\)".*/\1/')
+# [[:space:]] rather than \s: BSD sed (macOS) reads \s as a literal 's', which used to
+# hand the WHOLE LINE to --profile and fail a perfectly valid session.
+profile=$(grep -E '^\s*oci_config_profile' terraform.tfvars 2>/dev/null | sed 's/.*=[[:space:]]*"\(.*\)".*/\1/')
 profile="${profile:-DEFAULT}"
 if oci session validate --profile "$profile" >/dev/null 2>&1; then
     ok "OCI session for profile '$profile' is valid"
@@ -56,8 +61,8 @@ fi
 enabled=$(grep -E '^\s*enable_cloudflare\s*=' terraform.tfvars 2>/dev/null | grep -c true)
 emails=$(grep -cE '^\s*access_allowed_emails' terraform.tfvars 2>/dev/null)
 if [ "${enabled:-0}" -gt 0 ] && [ "${emails:-0}" -gt 0 ]; then
-    acct=$(grep -E '^\s*cf_account_id' terraform.tfvars | sed 's/.*=\s*"\(.*\)".*/\1/')
-    tok="${TF_VAR_cf_api_token:-$(grep -E '^\s*cf_api_token' terraform.tfvars 2>/dev/null | sed 's/.*=\s*"\(.*\)".*/\1/')}"
+    acct=$(grep -E '^\s*cf_account_id' terraform.tfvars | sed 's/.*=[[:space:]]*"\(.*\)".*/\1/')
+    tok="${TF_VAR_cf_api_token:-$(grep -E '^\s*cf_api_token' terraform.tfvars 2>/dev/null | sed 's/.*=[[:space:]]*"\(.*\)".*/\1/')}"
     if [ -n "$acct" ] && [ -n "$tok" ]; then
         body=$(curl -s -H "Authorization: Bearer $tok" \
             "https://api.cloudflare.com/client/v4/accounts/$acct/access/apps" 2>/dev/null)
@@ -74,5 +79,5 @@ if [ "${enabled:-0}" -gt 0 ] && [ "${emails:-0}" -gt 0 ]; then
 fi
 
 echo
-[ "$fail" -eq 0 ] && echo "ready: tofu apply" || echo "fix the FAIL lines above before applying."
+[ "$fail" -eq 0 ] && echo "ready: $TF apply" || echo "fix the FAIL lines above before applying."
 exit "$fail"

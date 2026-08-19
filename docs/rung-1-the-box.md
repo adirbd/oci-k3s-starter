@@ -39,6 +39,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command `
 ```bash
 sudo apt install git   # or your package manager's equivalent
 # OpenTofu: https://opentofu.org/docs/intro/install/
+# kubectl is not in the default apt repos; grab the binary directly:
+curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/$(dpkg --print-architecture)/kubectl"
+sudo install -m 0755 kubectl /usr/local/bin/kubectl && rm kubectl
 curl -fsSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash
 ```
 
@@ -134,9 +137,12 @@ Also set `oci_config_profile` to the profile name from step 2 if you did not cal
 
 ```bash
 tofu init
-./scripts/preflight.sh      # or preflight.ps1 — 10 seconds, saves 20 minutes
+../scripts/preflight.sh     # or preflight.ps1 — 10 seconds, saves 20 minutes
 tofu apply
 ```
+
+(`../scripts/`, not `./scripts/` — step 4 moved you into `terraform/`. The scripts
+themselves work from any directory.)
 
 The preflight checks the things that otherwise fail *late*: a tfvars that will not parse, an
 expired OCI session, missing tools. Each failure names its cause and its fix.
@@ -161,7 +167,7 @@ Things worth knowing:
 domains, which is what actually changes the answer:
 
 ```bash
-./scripts/retry-apply.sh            # or retry-apply.ps1 on Windows
+../scripts/retry-apply.sh           # or retry-apply.ps1 on Windows
 ```
 
 ## 6. Get in
@@ -169,10 +175,10 @@ domains, which is what actually changes the answer:
 **The short way** — fetches the kubeconfig and opens every UI at once:
 
 ```bash
-./scripts/connect.sh            # macOS, Linux, WSL, Git Bash
+../scripts/connect.sh           # macOS, Linux, WSL, Git Bash
 ```
 ```powershell
-./scripts/connect.ps1           # Windows PowerShell
+..\scripts\connect.ps1          # Windows PowerShell
 ```
 
 ### How this reaches the cluster, since nothing is open
@@ -247,7 +253,7 @@ to the cluster at boot, so there is nothing to change and nothing to remember:
 tofu output -raw grafana_admin_password     # user: admin
 ```
 
-`./scripts/connect.sh` prints it too. A rebuild produces the *same* password, because it
+`connect.sh` prints it too. A rebuild produces the *same* password, because it
 lives in Terraform state rather than in your head.
 
 ---

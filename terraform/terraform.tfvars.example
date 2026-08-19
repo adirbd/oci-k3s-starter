@@ -52,13 +52,6 @@ oci_config_profile = "DEFAULT"
 # ── Rung 2: Cloudflare. Leave false and everything still works. ───────────────────
 # enable_cloudflare = true
 # domain            = "example.com"
-# cf_account_id     = "..."
-# cf_zone_id        = "..."
-# cf_api_token      = "..."   # better: export TF_VAR_cf_api_token=... instead
-
-# ── Rung 2 in full ────────────────────────────────────────────────────────────────
-# enable_cloudflare = true
-# domain            = "example.com"
 # cf_account_id     = "..."      # Cloudflare dashboard, right-hand sidebar
 # cf_zone_id        = "..."      # same page, under the domain
 # cf_api_token      = "..."      # better: export TF_VAR_cf_api_token=...
@@ -66,7 +59,8 @@ oci_config_profile = "DEFAULT"
 #                                #         (+ Account:Access:Apps if using Access)
 #
 # ⚠ WITHOUT THIS LIST YOUR HOSTNAMES ARE PUBLIC. The tunnel closes your ports; it does
-# not ask who is knocking, and Grafana ships admin/admin.
+# not ask who is knocking — Grafana and Argo CD would sit on the open internet behind
+# nothing but their own login pages.
 # access_allowed_emails = ["you@example.com"]
 #
 # Override the routes only if you renamed things:
