@@ -25,10 +25,15 @@ data "oci_core_images" "ubuntu_arm" {
 # ── The box ───────────────────────────────────────────────────────────────────────
 
 resource "oci_core_instance" "main" {
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
-  compartment_id      = var.compartment_ocid
-  display_name        = var.instance_name
-  shape               = "VM.Standard.A1.Flex"
+  # Modulo, so the index wraps instead of erroring: regions have 1 or 3 ADs and the retry
+  # script does not need to know which. Asking a DIFFERENT AD is the single most effective
+  # response to "Out of host capacity" — the pools are separate.
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[
+    var.availability_domain_index % length(data.oci_identity_availability_domains.ads.availability_domains)
+  ].name
+  compartment_id = var.compartment_ocid
+  display_name   = var.instance_name
+  shape          = "VM.Standard.A1.Flex"
 
   # ⚠ EXPECT "Out of host capacity" ON YOUR FIRST TRY. This is the single most common
   # thing that goes wrong, it is not your configuration, and it is not permanent.

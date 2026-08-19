@@ -108,6 +108,13 @@ Things worth knowing:
 - Some people get it in minutes; some need a day of retrying. Neither means you did
   anything wrong.
 
+**There is a script for this** — it retries on a sensible interval and rotates availability
+domains, which is what actually changes the answer:
+
+```bash
+./scripts/retry-apply.sh            # or retry-apply.ps1 on Windows
+```
+
 ## 5. Get in
 
 **The short way** — fetches the kubeconfig and opens every UI at once:

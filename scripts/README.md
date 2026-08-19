@@ -6,12 +6,18 @@ Two kinds of thing live here. **Only the first is for you.**
 
 | | |
 |---|---|
-| `connect.sh` | fetch the kubeconfig and open every UI at once — macOS, Linux, WSL, Git Bash |
-| `connect.ps1` | the same, for Windows PowerShell |
+| `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
+| `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
 
 ```bash
-./scripts/connect.sh          # or ./scripts/connect.ps1
+./scripts/retry-apply.sh      # when apply says "Out of host capacity"
+./scripts/connect.sh          # once it exists
 ```
+
+`retry-apply.sh` is the one you will need first. "Out of host capacity" is the normal first
+answer when asking for a free ARM box, and Oracle offers no queue and no notification — only
+asking again. It rotates availability domains (capacity is tracked per-AD), backs off when
+throttled, and stops on anything that is not a capacity failure rather than burying it.
 
 It writes `kubeconfig` into the repo root (gitignored), prints the Argo CD password, and
 holds four port-forwards open until you press Ctrl-C. Until rung 2 gives you real

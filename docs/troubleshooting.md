@@ -15,9 +15,49 @@ Ordered by how often it happens.
 - `LaunchInstance` is rate-limited to discourage polling — retry every few minutes and
   back off on 429.
 
+**Do not sit there re-running it by hand:**
+
+```bash
+./scripts/retry-apply.sh            # macOS, Linux, WSL, Git Bash
+./scripts/retry-apply.ps1           # Windows PowerShell
+```
+
+It asks every five minutes, **rotates availability domains** (capacity is per-AD, so a
+different AD is a genuinely different question), backs off exponentially if Oracle throttles
+it, and stops immediately on anything that is *not* a capacity failure — so an expired
+session or a bad variable surfaces instead of looping all night.
+
+Asking for less also helps, and a 1-core box is a real cluster:
+
+```bash
+./scripts/retry-apply.sh -var ocpus=1 -var memory_gb=6
+```
+
 > **Never terminate a working A1 instance to "free up allowance" for a new one.** The next
 > launch is not guaranteed to succeed, and people have ended up with zero instances doing
 > exactly this. Build the replacement first.
+
+## `tofu apply` fails with an authentication or 401 error
+
+**Almost always an expired session.** `oci session authenticate` issues a SHORT-LIVED
+token — it does not last the week. If it worked yesterday and not today, that is this:
+
+```bash
+oci session refresh --profile <name>
+```
+
+If refresh also fails, the session is past renewing — run `oci session authenticate` again.
+
+**The other cause is the profile name.** `oci session authenticate` prompts you for one, and
+most people type something memorable rather than `DEFAULT`. Whatever you typed has to be in
+`terraform.tfvars`:
+
+```hcl
+oci_config_profile = "the-name-you-typed"
+```
+
+Check which profiles exist with `cat ~/.oci/config | grep '^\['`. The error you get for a
+wrong profile does not mention profiles.
 
 ## The box is up but there is no cluster
 
@@ -157,6 +197,56 @@ Confirm what it is actually pointed at:
 
 ```bash
 kubectl -n argocd get application root -o jsonpath='{.spec.source}' | jq
+```
+
+## My pod says `exec format error`
+
+**Your image is the wrong architecture.** Oracle's free tier is Ampere — **aarch64** — and
+a normal `docker build` on an Intel or Apple-Silicon machine, or on a standard GitHub
+runner, produces an **amd64** image. Kubernetes pulls it, starts it, and the binary cannot
+run. The message says nothing about architecture, so people go looking in their Dockerfile.
+
+Check what you actually pushed:
+
+```bash
+docker manifest inspect ghcr.io/you/your-app:tag | grep -i architecture
+```
+
+Build for ARM — [`examples/build-and-push.yaml`](../examples/build-and-push.yaml) does this
+with `platforms: linux/arm64`. See [rung 3](rung-3-your-app.md).
+
+## My pod says `ImagePullBackOff`
+
+If the image is **private**, the cluster has no credentials for it. Nothing gives Kubernetes
+your GitHub login automatically.
+
+```bash
+kubectl -n <ns> describe pod <pod> | tail -20   # the real reason is at the bottom
+```
+
+`unauthorized` or `denied` means credentials. Either make the package public — image
+visibility is a **separate setting from the repo's**, so your code can stay private — or
+create a pull secret ([rung 3](rung-3-your-app.md#private-repo--app-vs-token)).
+
+`not found` usually means a typo in the tag, or you pushed `latest` and referenced a SHA.
+
+## I pushed to Git and nothing happened
+
+Check what Argo is actually watching:
+
+```bash
+kubectl -n argocd get application root -o jsonpath='{.spec.source.repoURL}'
+```
+
+If that is **not your repo**, your push went somewhere Argo has never looked. Out of the box
+it points at this project, and pointing it at yours is [rung 3](rung-3-your-app.md).
+
+Note `gitops_repo_url` is baked into cloud-init, which runs **once at first boot** — changing
+it in `terraform.tfvars` afterwards does nothing to a running box. Edit the live object
+instead:
+
+```bash
+kubectl -n argocd edit application root
 ```
 
 ## Argo shows an app as OutOfSync forever

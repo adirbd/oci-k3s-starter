@@ -122,6 +122,17 @@ variable "boot_volume_gb" {
   }
 }
 
+variable "availability_domain_index" {
+  description = "Which availability domain to build in, by position (0, 1, 2...). CAPACITY IS TRACKED PER AD, so when a launch fails with 'Out of host capacity', asking a different AD is a genuinely different request — retrying the same one can fail all day. scripts/retry-apply.sh rotates this for you. Wraps automatically, so any number is legal even in single-AD regions."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.availability_domain_index >= 0
+    error_message = "availability_domain_index must be 0 or greater."
+  }
+}
+
 variable "image_ocid" {
   description = "Optional: pin a specific Ubuntu ARM image OCID. Leave null to look up the newest Canonical Ubuntu 24.04 aarch64 image automatically. Image OCIDs are region-specific, so a pinned value from one region is invalid in another."
   type        = string
