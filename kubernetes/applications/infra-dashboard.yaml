@@ -1,0 +1,27 @@
+# The curated dashboard, deployed as plain manifests from this repo.
+#
+# Separate from the observability Application on purpose: the chart owns its own dashboards
+# and this one is ours, so a chart upgrade cannot quietly replace or drop it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dashboard
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # ⚠ Your fork, if you forked. This path must exist in whatever repo Argo watches.
+    repoURL: https://github.com/adirbd/oci-k3s-starter.git
+    targetRevision: HEAD
+    path: kubernetes/manifests/dashboard
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

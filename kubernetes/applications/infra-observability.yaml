@@ -105,6 +105,12 @@ spec:
             dashboards:
               enabled: true # picks up ConfigMaps labelled grafana_dashboard: "1"
 
+          # Land on the curated dashboard rather than a list of dashboards. Without this,
+          # opening Grafana shows a directory and the useful one is three clicks away.
+          grafana.ini:
+            dashboards:
+              default_home_dashboard_path: /tmp/dashboards/your-cluster.json
+
         # A curated few, rather than everything the chart ships.
         #
         # ⚠ THERE IS NO "DISABLE ALL, THEN ENABLE THESE" SWITCH. Every dashboard the chart
@@ -124,8 +130,11 @@ spec:
           enabled: true
           dashboards:
             # ── kept ──────────────────────────────────────────────────────────────
+            # ⚠ ~200 panels. Genuinely useful when you have a specific question about the
+            # host, genuinely overwhelming as a first impression — which is what a new user
+            # reported. Kept, because "my box is slow" needs it; not the landing page.
             node-exporter-full:
-              enabled: true # the box: CPU, memory, disk, network
+              enabled: true
             victoriametrics-single-node:
               enabled: true # is the monitoring itself healthy
             victoriametrics-vmagent:
