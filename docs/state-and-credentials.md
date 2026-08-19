@@ -26,46 +26,49 @@ What you are accepting:
 
 `.gitignore` already excludes it. Keep it that way.
 
-### Remote — start with OCI Object Storage
+### Remote — one command
 
-The obvious choice is the account you already have. **Always Free includes 20 GB of object
+The obvious home is the account you already have: **Always Free includes 20 GB of object
 storage**, and OCI exposes an **S3-compatible** endpoint, so the standard `s3` backend works
-with no new vendor, no new bill, and no new login.
+with no new vendor, no new bill and no new login.
 
-1. **Create a bucket** — Storage → Buckets → Create. Any name; keep it private.
-2. **Create a Customer Secret Key** — Profile → your user → Customer Secret Keys → Generate.
-   This gives an access key and secret; it is *not* your API signing key.
-3. **Find your object storage namespace** — shown on the bucket page, or
-   `oci os ns get`.
-4. Uncomment the backend in `terraform/versions.tf` and fill it in:
+Terraform cannot create its own backend in one step — a backend has to exist before
+`tofu init` — so this does it in two stages and hides the seam:
 
 ```hcl
-backend "s3" {
-  bucket = "your-bucket"
-  key    = "oci-k3s-starter/terraform.tfstate"
-  region = "eu-frankfurt-1"                     # your region
-
-  endpoints = {
-    s3 = "https://<namespace>.compat.objectstorage.<region>.oraclecloud.com"
-  }
-
-  # S3-compatible, not actual AWS — these skips are required, not optional.
-  skip_credentials_validation = true
-  skip_region_validation      = true
-  skip_requesting_account_id  = true
-  skip_s3_checksum            = true
-  use_path_style              = true
-}
+# terraform.tfvars
+enable_remote_state = true
+oci_user_ocid       = "ocid1.user.oc1..aaaa..."   # Profile menu > your username > OCID
 ```
 
 ```bash
-export AWS_ACCESS_KEY_ID=<customer secret key id>
-export AWS_SECRET_ACCESS_KEY=<customer secret key>
-tofu init -migrate-state
+./scripts/enable-remote-state.sh
 ```
 
+That creates the bucket (versioned, private), generates an S3 **Customer Secret Key**, writes
+`backend.hcl`, and runs `tofu init -migrate-state`. The only thing it cannot do for you is
+uncomment the `backend "s3" {}` block in `versions.tf`; it stops and tells you when it gets
+there.
+
+**Why `oci_user_ocid` is the one thing you have to paste:** a Customer Secret Key belongs to
+a user, and a browser session does not tell Terraform which human is driving it. Everything
+else — the namespace, the endpoint, the bucket — is looked up or created.
+
+Afterwards, every `tofu` command needs the credentials in the environment:
+
+```bash
+export AWS_ACCESS_KEY_ID=$(tofu output -raw state_s3_access_key_id)
+export AWS_SECRET_ACCESS_KEY=$(tofu output -raw state_s3_secret_access_key)
+```
+
+> ⚠ **Those outputs read the state they unlock.** Once your laptop's copy is gone you need
+> another source. **With [rung 4](rung-4-secrets.md) enabled they are also written to OCI
+> Vault** as `<instance_name>-terraform-state-s3`, readable from the console on a machine
+> that has nothing else — which answers "where do I keep these without a password manager".
+> Without rung 4, put them somewhere safe while you still have them.
+
 **Cloudflare R2** works identically (10 GB free) if you would rather keep it there — same
-block, different endpoint, `region = "auto"`.
+shape, different endpoint, `region = "auto"`, and you create the bucket and token yourself.
 
 ### Encrypt it, wherever it lives
 
