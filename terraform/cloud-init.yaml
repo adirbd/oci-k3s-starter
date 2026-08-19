@@ -196,7 +196,10 @@ write_files:
       #
       # Harmless before the operator exists: the apply fails while the CRD is absent, and
       # the timer retries in fifteen minutes, by which time Argo has deployed it.
-      if [ -s /etc/k3s-starter/clustersecretstore.yaml ]; then
+      # grep for content, not `[ -s ]`: with enable_vault off the template renders an
+      # empty block and the written file still holds one newline, which counts as
+      # "non-empty" — and a kubectl apply on it logs a spurious retry line every 15 min.
+      if grep -q '[^[:space:]]' /etc/k3s-starter/clustersecretstore.yaml 2>/dev/null; then
         log "asserting the OCI Vault ClusterSecretStore"
         kubectl apply -f /etc/k3s-starter/clustersecretstore.yaml || \
           log "  (external-secrets CRDs not present yet — will retry next run)"

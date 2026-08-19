@@ -48,8 +48,11 @@ if (Test-Path 'terraform.tfvars') {
     # too, and this check fires with the placeholder "..." as an account id.
     if ($tf -match '(?m)^\s*enable_cloudflare\s*=\s*true' -and $tf -match '(?m)^\s*access_allowed_emails') {
         $acct = if ($tf -match '(?m)^\s*cf_account_id\s*=\s*"(.*)"') { $Matches[1] } else { $null }
+        # CLOUDFLARE_API_TOKEN is the provider's own variable and what the docs recommend —
+        # mirror the provider's order: the terraform variable first, then its native env var.
         $tok  = if ($env:TF_VAR_cf_api_token) { $env:TF_VAR_cf_api_token }
-                elseif ($tf -match '(?m)^\s*cf_api_token\s*=\s*"(.*)"') { $Matches[1] } else { $null }
+                elseif ($tf -match '(?m)^\s*cf_api_token\s*=\s*"(.*)"') { $Matches[1] }
+                elseif ($env:CLOUDFLARE_API_TOKEN) { $env:CLOUDFLARE_API_TOKEN } else { $null }
         if ($acct -and $tok) {
             try {
                 $r = Invoke-RestMethod -Uri "https://api.cloudflare.com/client/v4/accounts/$acct/access/apps" `

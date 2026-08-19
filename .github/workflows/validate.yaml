@@ -38,11 +38,16 @@ jobs:
       - name: cloud-init renders and parses
         run: |
           mkdir -p /tmp/render && cp terraform/cloud-init.yaml /tmp/render/
-          cat > /tmp/render/main.tf <<'EOF'
+          # argocd_version comes from variables.tf, not a copy here: renovate bumps the
+          # default, and a hardcoded copy silently rendered a version nobody ships.
+          # (check-argocd-manifest.py already reads it the same way.)
+          ARGOCD_VERSION=$(sed -n '/variable "argocd_version"/,/^}/s/.*default *= *"\(.*\)".*/\1/p' terraform/variables.tf)
+          test -n "$ARGOCD_VERSION" || { echo "could not read argocd_version default"; exit 1; }
+          cat > /tmp/render/main.tf <<EOF
           output "rendered" {
-            value = templatefile("${path.module}/cloud-init.yaml", {
+            value = templatefile("\${path.module}/cloud-init.yaml", {
               k3s_channel      = "stable"
-              argocd_version   = "v3.2.0"
+              argocd_version   = "$ARGOCD_VERSION"
               gitops_repo_url  = "https://example.com/repo.git"
               gitops_repo_path = "kubernetes/applications"
               clustersecretstore     = "" # rendered by instance.tf when enable_vault is true
