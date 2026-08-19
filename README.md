@@ -135,7 +135,8 @@ instance principal — so there is no API key on the server to steal or rotate.
 
 - **Cloudflare** + a domain — **the one thing here that costs money** (~$10/year for the
   domain; the Cloudflare plan itself is free). Strongly recommended anyway: it is what
-  gives you a valid HTTPS certificate, a login in front of everything, and no open ports.
+  gives you a valid HTTPS certificate, a login in front of everything, and no web ports
+  open (SSH stays; nothing else does).
   Everything still works without it — rung 1 needs none of it. See
   [rung 2](docs/rung-2-real-urls.md) for why it is worth ten dollars.
 - **Tailscale** — a private path to the box that survives you breaking the public one.

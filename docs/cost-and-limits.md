@@ -83,7 +83,7 @@ quarter of the machine, not most of it.
 - **Reserved public IPs.** The instance uses an *ephemeral* IP, which survives reboot and
   stop/start and is only released on termination.
 - **Load balancers.** Free tier includes a small one, but this repo uses a Cloudflare
-  Tunnel instead — no inbound ports, and no allowance spent.
+  Tunnel instead — no web ports open, and no allowance spent.
 - **NAT gateways.** Not used. The single subnet is public.
 - **Block volumes beyond 200 GB**, and **backups** of them.
 

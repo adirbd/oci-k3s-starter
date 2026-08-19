@@ -97,7 +97,7 @@ deployment that dials out.
 ## What it gets you
 
 `grafana.example.com` works from anywhere, with a login in front of it, **and your box
-still has no inbound ports open.**
+opens no web ports at all** — the only inbound rule stays SSH.
 
 That last part is the interesting bit. A Cloudflare Tunnel is a connector *inside* the
 cluster that dials **outbound** to Cloudflare and holds the connection open. Traffic
@@ -107,7 +107,7 @@ arrives at Cloudflare's edge and is handed back down that existing connection.
 flowchart LR
     B["browser"] --> CF["Cloudflare edge<br/>TLS + Access login"]
     CF -. "back down a connection<br/>the cluster opened" .-> CFD
-    subgraph BOX["your box · no inbound ports"]
+    subgraph BOX["your box · no web ports open"]
         CFD["cloudflared pod"] --> S["Service<br/>Grafana, Argo, Homepage"]
     end
     CFD -- "dials OUT" --> CF
@@ -117,8 +117,8 @@ flowchart LR
 The connector dials **out** and holds the connection open. Requests arrive at Cloudflare
 and come back down it — so nothing is listening on the public internet.
 
-Your security list still has exactly one inbound rule, for SSH. There is nothing else to
-port-scan.
+Your security list still has exactly one inbound rule, for SSH. There is no web port to
+scan, and nothing serving HTTP that could have a CVE.
 
 Note there is **no ingress controller** in that path. The tunnel terminates the request and
 hands it straight to a Kubernetes Service, so k3s's Traefik stays disabled and you save
