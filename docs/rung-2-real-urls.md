@@ -340,6 +340,57 @@ Cloudflare's own docs are the right place for either:
 > and is stronger than emailed codes. Move to Google or GitHub when you want other people
 > logging in with an identity they already manage — not before.
 
+## Log into Grafana with the same identity
+
+Right now there are two logins: Access at the edge, then Grafana's own underneath. You can
+collapse them, so whoever Access let in is simply *already logged into Grafana*.
+
+**And this is the answer to "should we use Google or the Cloudflare login?" — it does not
+matter here.** Access does the authenticating and hands Grafana a signed statement of who
+you are. Change your identity provider later and Grafana needs no edit: it trusts whatever
+Access verified.
+
+Access sends every authenticated request a `Cf-Access-Jwt-Assertion` header containing a
+signed JWT with the user's verified `email`. Grafana can validate that against Cloudflare's
+public keys and log the person in.
+
+**You need two values:**
+
+```bash
+tofu output access_aud_tags        # the AUD for the grafana app
+```
+
+…and your **team domain**, the one you chose when enabling Access — `something.cloudflareaccess.com`.
+
+Then add this to `grafana:` in `kubernetes/applications/infra-observability.yaml`:
+
+```yaml
+grafana.ini:
+  auth.jwt:
+    enabled: true
+    header_name: Cf-Access-Jwt-Assertion
+    email_claim: email
+    username_claim: email
+    auto_sign_up: true
+    jwk_set_url: https://YOUR-TEAM.cloudflareaccess.com/cdn-cgi/access/certs
+    expect_claims: '{"aud": "YOUR-AUD-TAG"}'
+  auth:
+    signout_redirect_url: https://YOUR-TEAM.cloudflareaccess.com/cdn-cgi/access/logout
+```
+
+Commit, and Argo rolls Grafana. Visiting `grafana.example.com` now lands you straight in.
+
+> ⚠ **`expect_claims` is the load-bearing line.** Without it Grafana accepts any JWT your
+> team domain signed — including one issued for a *different* application. Pinning the AUD
+> is what makes this a check rather than a formality.
+
+> **Keep the password login working while you test.** If the JWT config is wrong you get a
+> redirect loop or a blank page, and `admin` + `tofu output -raw grafana_admin_password` is
+> how you get back in to fix it. Add `disable_login_form: true` only once SSO works.
+
+Everyone you add to `access_allowed_emails` gets a Grafana account automatically, named by
+their email. Roles are Grafana's business after that.
+
 ## Rolling back
 
 Set `enable_cloudflare = false` and apply — the tunnel, DNS records and Access apps are all
