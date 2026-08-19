@@ -155,6 +155,27 @@ on a laptop, never in a shell, and never on the instance's disk.
 - **Free tier.** `DEFAULT` vault, `SOFTWARE` keys, 150 secrets. `VIRTUAL_PRIVATE` vaults
   and HSM keys are billed — and a vault's type **cannot be downgraded** once created.
 
+## Removing it
+
+`tofu destroy` cleans up the dynamic group and the policy immediately — they are ordinary
+IAM objects.
+
+**The vault is different, and you should know before you enable this rung.** OCI does not
+delete vaults on request: it *schedules* deletion, with a minimum waiting period measured
+in days. So after a successful `destroy` you will still see the vault in the console,
+marked `PENDING_DELETION`, for a while.
+
+What that means in practice:
+
+- **It costs nothing.** A `DEFAULT` vault is free, pending deletion or not.
+- **It is not stuck.** You can cancel the scheduled deletion, or leave it to complete.
+- **You are not blocked.** Vault names are not unique, so you can create another
+  immediately — a rebuild is unaffected.
+
+It is only worth knowing because "I destroyed it and it is still there" reads like a bug,
+and because a repeated build-and-tear-down cycle leaves a small trail of pending vaults
+behind it.
+
 ## Why not SOPS
 
 The homelab this came from uses SOPS with an age key, and deliberately does **not** on this

@@ -186,6 +186,23 @@ open pull requests for the chart, image, provider and Argo CD pins.
 > a Renovate with nothing to do. Treat *"when did the bot last open a PR?"* as a health
 > signal.
 
+## Removing it
+
+```bash
+cd terraform
+tofu destroy
+```
+
+That takes the instance, its boot volume, the network, the serial console and — if you
+enabled them — the Cloudflare tunnel, DNS records and Access applications. Nothing is left
+running and nothing is billed.
+
+**One exception, and it surprises people:** if you enabled rung 4, **OCI does not delete a
+vault immediately.** Deletion is *scheduled*, with a minimum waiting period measured in
+days, so the vault stays visible in the console marked `PENDING_DELETION` after `destroy`
+reports success. That is Oracle's behaviour, not a failure, and a vault in that state costs
+nothing. See [rung 4](docs/rung-4-secrets.md#removing-it).
+
 ## Where this came from
 
 Extracted from a working two-site homelab where this box is the off-site half — it watches
