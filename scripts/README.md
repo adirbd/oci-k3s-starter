@@ -10,6 +10,7 @@ Two kinds of thing live here. **Only the first is for you.**
 | `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
 | `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
 | `set-gitops-repo.sh` | point Argo CD at a different repo on a running box |
+| `enable-remote-state.sh` | move Terraform state off your laptop into your own OCI bucket |
 
 ```bash
 ./scripts/retry-apply.sh      # when apply says "Out of host capacity"

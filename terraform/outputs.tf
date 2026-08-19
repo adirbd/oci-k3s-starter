@@ -141,3 +141,34 @@ output "access_aud_tags" {
     for k, app in cloudflare_zero_trust_access_application.protected : k => app.aud
   }
 }
+
+# ── Remote state (null unless enable_remote_state = true) ─────────────────────────
+
+output "state_backend_config" {
+  description = "The backend block for terraform/versions.tf, filled in. scripts/enable-remote-state.sh writes this for you."
+  value = var.enable_remote_state ? join("\n", [
+    "bucket = \"${var.state_bucket_name}\"",
+    "key    = \"${var.instance_name}/terraform.tfstate\"",
+    "region = \"${var.region}\"",
+    "",
+    "endpoints = { s3 = \"https://${try(data.oci_objectstorage_namespace.ns[0].namespace, "")}.compat.objectstorage.${var.region}.oraclecloud.com\" }",
+    "",
+    "skip_credentials_validation = true",
+    "skip_region_validation      = true",
+    "skip_requesting_account_id  = true",
+    "skip_s3_checksum            = true",
+    "use_path_style              = true",
+  ]) : "(set enable_remote_state = true first)"
+}
+
+output "state_s3_access_key_id" {
+  description = "AWS_ACCESS_KEY_ID for the state bucket."
+  value       = var.enable_remote_state ? oci_identity_customer_secret_key.state[0].id : null
+  sensitive   = true
+}
+
+output "state_s3_secret_access_key" {
+  description = "AWS_SECRET_ACCESS_KEY for the state bucket. Returned once at creation and kept in state thereafter."
+  value       = var.enable_remote_state ? oci_identity_customer_secret_key.state[0].key : null
+  sensitive   = true
+}

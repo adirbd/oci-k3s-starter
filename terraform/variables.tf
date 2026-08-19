@@ -57,7 +57,7 @@ variable "oci_tenancy_ocid" {
 }
 
 variable "oci_user_ocid" {
-  description = "APIKey auth only: user OCID."
+  description = "Your user OCID. Needed for TWO things: APIKey auth, and enable_remote_state (a Customer Secret Key belongs to a user). Profile menu > your username > OCID. It is the one value that cannot be looked up — a browser session does not tell Terraform which human is driving it."
   type        = string
   default     = null
 }
@@ -316,4 +316,20 @@ variable "public_http_cidr" {
   description = "Who may reach ports 80/443 when enable_public_http = true. Defaults to the whole internet, which is the point of a web server — narrow it to your own address if you are only testing."
   type        = string
   default     = "0.0.0.0/0"
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════
+#  REMOTE STATE — optional, and off by default.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+variable "enable_remote_state" {
+  description = "Create an OCI Object Storage bucket and S3 credentials for Terraform state, so it stops living only on your laptop. Local state is fine for one person; this is for durability and for working from more than one machine. Run scripts/enable-remote-state.sh rather than doing it by hand."
+  type        = bool
+  default     = false
+}
+
+variable "state_bucket_name" {
+  description = "Name for the state bucket. Bucket names are unique per tenancy, not globally."
+  type        = string
+  default     = "terraform-state"
 }
