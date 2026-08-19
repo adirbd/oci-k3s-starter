@@ -2,8 +2,8 @@
 
 **A free ARM server running your container, with deploys and monitoring already wired.**
 
-Oracle Cloud gives away an Arm server for nothing: **2 cores and 12 GB of RAM permanently**,
-and up to 4 cores / 24 GB while your account is still in its trial.
+Oracle Cloud's Always Free tier includes an Arm server. This repo is sized for **2 cores and
+12 GB of RAM** — what a free account reliably keeps — and yours may allow more.
 This turns it into a small personal platform: `k3s` for the runtime, **Argo CD** so a
 `git push` is the deploy button, **Grafana** so you can see what your app is doing, and
 **Homepage** so you have one URL that lists everything.

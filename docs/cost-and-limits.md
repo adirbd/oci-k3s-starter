@@ -100,7 +100,8 @@ rung 1 needs no domain at all.
 To be precise about who charges you: **Cloudflare's plan is free** — the tunnel, the TLS
 certificate, Access with SSO, DDoS protection, the WAF and the CDN all cost nothing on the
 free tier. What costs money is *registering a name*, which you pay a registrar for.
-Cloudflare Registrar happens to sell at wholesale with no markup (~$10.44/yr for `.com`),
+Cloudflare Registrar happens to sell at wholesale with no markup (about $10-11/yr for a
+`.com` when this was written — prices drift, so check),
 and other TLDs are often cheaper.
 
 Whether it is worth it is argued in full in [rung 2](rung-2-real-urls.md) — the short
