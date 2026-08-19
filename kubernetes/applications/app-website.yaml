@@ -1,0 +1,23 @@
+# Your website, deployed from your fork by Argo CD. Replaces the podinfo sample.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: website
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/danieliyahu1/oci-k3s-starter.git
+    targetRevision: HEAD
+    path: apps/website
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: website
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

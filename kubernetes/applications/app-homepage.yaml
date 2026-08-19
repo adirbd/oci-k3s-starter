@@ -87,11 +87,10 @@ spec:
                     href: https://grafana.danieliyahu.com
 
             - Your apps:
-                # podinfo, from app-sample.yaml. Delete this entry when you delete that.
-                - Sample (podinfo):
-                    description: proof the cluster works — delete me
-                    icon: kubernetes
-                    href: http://localhost:9898
+                - Daniel's Website:
+                    description: personal site
+                    icon: globe
+                    href: https://www.danieliyahu.com
 
           widgets:
             - kubernetes:
