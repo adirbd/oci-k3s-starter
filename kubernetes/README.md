@@ -12,7 +12,9 @@ applications/                  deployed automatically
 ├── infra-observability.yaml   VictoriaMetrics + Grafana
 ├── infra-dashboard.yaml       the one dashboard worth opening
 ├── app-homepage.yaml          one page listing everything
-└── app-sample.yaml            podinfo — proof it works, delete when done
+└── app-sample.yaml            podinfo — proof it works, delete when done (and take the
+                               "Your apps" group in app-homepage.yaml with it — an empty
+                               group crashes the whole dashboard, #30)
 
 optional/                      NOT deployed — copy into applications/ when you want them
 ├── app-cloudflared.yaml       the tunnel connector          (rung 2)
