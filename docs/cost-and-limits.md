@@ -108,13 +108,53 @@ Whether it is worth it is argued in full in [rung 2](rung-2-real-urls.md) — th
 version is that a valid HTTPS certificate is not cosmetic, since browsers disable service
 workers, passkeys, the clipboard API and camera access on insecure origins.
 
+## If you upgrade to Pay As You Go
+
+"Upgrade to PAYG" is the standard community fix for **"Out of host capacity"**, and it
+genuinely works — paying tenancies get A1 capacity that Free Tier requests are refused.
+The Always Free allowance survives the upgrade (many accounts report keeping the full
+4 cores / 24 GB rather than dropping to 2 / 12 — as ever, **your** Limits page is
+authoritative, not this one). So the upgrade can be a pure availability move.
+
+**But it silently changes the failure mode.** On Free Tier, Oracle *cannot bill you* —
+overshoot is punished with the deletion described at the top of this page. On PAYG, the
+same overshoot just… bills. The safety net you never noticed is gone the moment the
+upgrade completes.
+
+What this repo does about it, on any account type:
+
+1. **The caps do not move.** `variables.tf` refuses anything outside the Always Free
+   shape regardless of how the tenancy is billed: 4 cores, 24 GB RAM, 200 GB storage,
+   A1.Flex only. Everything else it creates — VCN, ephemeral IP (never a reserved one),
+   Cloudflare tunnel instead of a load balancer, `DEFAULT`-type vault, the state bucket
+   inside the 20 GB object-storage allowance — sits in services that are free on any
+   account. **Upgrading is meant to buy availability, not to allow paid infrastructure**,
+   and the configuration keeps refusing the latter either way.
+
+2. **A zero-spend budget, as code.** One value in `terraform.tfvars`:
+
+   ```hcl
+   budget_alert_email = "you@example.com"
+   ```
+
+   The next apply creates a budget of **1** (your billing currency) per month over the
+   compartment, alerting at both *forecast* and *actual* — in effect, "email me the
+   moment Oracle believes this month will not be free". It catches what the caps cannot
+   see: a resource clicked up in the console, a free allowance Oracle changes, a mistake
+   in a fork. On a never-upgraded Free Tier it is safely unnecessary (there is nothing
+   to bill), which is why it only turns on once you give it an address.
+
+Two honest caveats: budget evaluation is not instant — Oracle refreshes cost data a few
+times a day, so the email can lag the mistake by hours — and budgets attach to the
+**root compartment**, so if your `compartment_ocid` is a child compartment you must set
+`tenancy_ocid` as well.
+
 ## Watch it yourself
 
-Set a budget alert. Free tier or not, it is one click and it turns "surprise bill" into
-"email":
-
-**Billing → Cost Management → Budgets** → create one for the root compartment at any
-amount above zero, alerting at 100%.
+Set `budget_alert_email` even if nothing else on this page applies to you — free tier or
+not, it turns "surprise bill" into "email". (Not applying yet? The console equivalent is
+**Billing → Cost Management → Budgets**: root compartment, any amount above zero,
+alerting at 100%.)
 
 Then check **Governance → Limits, Quotas and Usage**, filter to `Compute`, and look at
 `VM.Standard.A1.Flex` — it shows exactly how much of your ARM allowance is in use, which
