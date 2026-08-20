@@ -202,15 +202,22 @@ Test-NetConnection <ip> -Port 6443    # False — this is correct
 
 ## kubectl says the connection is refused
 
-The kubeconfig on the box points at `127.0.0.1`, which is correct *there* and useless from
-your laptop. Rewrite it:
+kubectl is pointed at `127.0.0.1:6443` with no tunnel carrying it there. The address is
+correct — **do not rewrite it to the public IP**; as the section above explains, the port
+is closed and the certificate would fail even if it were open. What is missing is the
+tunnel:
 
 ```bash
-ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml' | sed 's/127.0.0.1/<ip>/' > kubeconfig
+ssh -N -L 6443:127.0.0.1:6443 ubuntu@<ip> &
+export KUBECONFIG=$PWD/kubeconfig
 ```
 
-Note this reaches the API server over the public internet. Fine for one developer with a
-narrow `ssh_allowed_cidr`; not what you want long-term. Rung 2 and Tailscale both fix it.
+`./scripts/connect.sh` (or `connect.ps1`) does both. If the tunnel is up and the answer
+is still a refusal, k3s itself is not listening yet — watch the bootstrap finish:
+
+```bash
+ssh ubuntu@<ip> 'sudo journalctl -u k3s-starter-bootstrap -f'
+```
 
 ## Argo is up but no apps appear at all
 

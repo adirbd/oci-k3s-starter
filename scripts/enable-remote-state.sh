@@ -41,13 +41,37 @@ need oci_user_ocid || { echo "  oci_user_ocid is missing from terraform.tfvars �
 # Once the backend is live, everything below either fails (apply against a backend that
 # is not initialised in THIS shell) or is a no-op. Say so instead of half-running.
 if backend_active && [ -f backend.hcl ]; then
-    cat <<MSG
-  remote state looks enabled already: versions.tf declares the backend and backend.hcl
-  exists. Nothing to do. To verify, run (with the AWS_* credentials in the environment):
+    # Success is only claimed when the migration actually happened: a completed
+    # `init -migrate-state` records the backend in .terraform/terraform.tfstate.
+    # Declared-plus-backend.hcl alone also describes a run that died mid-migration.
+    if grep -qs '"type": *"s3"' .terraform/terraform.tfstate; then
+        cat <<MSG
+  remote state is enabled: versions.tf declares the backend, backend.hcl exists, and
+  the migration completed. Nothing to do. To verify, run (with the AWS_* credentials
+  in the environment):
 
       $TF init -backend-config=backend.hcl && $TF state list
 MSG
-    exit 0
+        exit 0
+    fi
+    # An earlier run stopped between declaring the backend and finishing the migration.
+    if [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+        echo "── resuming an interrupted migration"
+        "$TF" init -backend-config=backend.hcl -migrate-state
+        echo "done. State now lives in your OCI tenancy, versioned."
+        exit 0
+    fi
+    cat <<MSG
+  versions.tf declares the backend and backend.hcl exists, but the migration never
+  completed — an earlier run stopped part-way. Plain '$TF output' cannot read the
+  bucket credentials any more (with a declared, uninitialised backend, every command
+  refuses to run until init), so put them in the environment and re-run this script:
+
+      export AWS_ACCESS_KEY_ID=...       # OCI Vault (rung 4), your password manager,
+      export AWS_SECRET_ACCESS_KEY=...   # or: comment the backend block back out, read
+                                         # the two state_s3_* outputs, restore the block.
+MSG
+    exit 1
 fi
 if backend_active; then
     cat <<'MSG'
@@ -61,9 +85,16 @@ fi
 echo "── stage 1: creating the bucket and credentials (local state)"
 "$TF" apply -auto-approve
 
-echo "── stage 2: writing backend.hcl"
+echo "── stage 2: writing backend.hcl and reading the bucket credentials"
 "$TF" output -raw state_backend_config > backend.hcl
 echo "  wrote terraform/backend.hcl  (gitignored)"
+# Read the credentials NOW, while plain `output` still works — the moment stage 3
+# declares the backend, every command (output included) refuses to run until init.
+# Assignment and export are separate on purpose: `export X="$(cmd)"` masks a failing
+# $(cmd) from set -e and would carry an empty credential into the migration.
+AWS_ACCESS_KEY_ID="$("$TF" output -raw state_s3_access_key_id)"
+AWS_SECRET_ACCESS_KEY="$("$TF" output -raw state_s3_secret_access_key)"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
 # Terraform needs `backend "s3" {}` to exist before -backend-config means anything. The
 # block is EMPTY on purpose — every value comes from backend.hcl — and the commented
@@ -73,8 +104,6 @@ awk '/^terraform {/ && !done { print; print "  backend \"s3\" {}"; done=1; next 
     versions.tf > versions.tf.tmp && mv versions.tf.tmp versions.tf
 
 echo "── stage 4: migrating state into the bucket"
-export AWS_ACCESS_KEY_ID="$("$TF" output -raw state_s3_access_key_id)"
-export AWS_SECRET_ACCESS_KEY="$("$TF" output -raw state_s3_secret_access_key)"
 "$TF" init -backend-config=backend.hcl -migrate-state
 
 cat <<MSG

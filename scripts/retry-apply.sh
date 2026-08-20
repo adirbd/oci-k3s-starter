@@ -41,7 +41,7 @@ set -uo pipefail
 
 INTERVAL="${INTERVAL:-300}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-0}"   # 0 = forever
-TF="${TF:-tofu}"
+TF="${TF:-tofu}"; command -v "$TF" >/dev/null 2>&1 || TF=terraform
 
 cd "$(dirname "$0")/../terraform" || exit 1
 

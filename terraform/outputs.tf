@@ -24,10 +24,15 @@ output "next_steps" {
     1. Get in:             ../scripts/connect.sh   (connect.ps1 on Windows)
                            It fetches the kubeconfig, opens the SSH tunnel — the only
                            way in; 6443 is deliberately closed — and port-forwards
-                           every UI. By hand instead: the `kubeconfig_command` output.
-    2. Watch it come up:   kubectl get pods -A -w
+                           every UI, then stays running. Leave it up.
+                           By hand instead: the `kubeconfig_command` output.
+    2. In a SECOND shell:  export KUBECONFIG=$PWD/../kubeconfig
+                           (connect.sh wrote it to the repo root), then watch it come up:
+                           kubectl get pods -A -w
        (the bootstrap timer runs every 15 min, so a slow first boot catches up on its own)
     3. Argo CD UI:         https://localhost:8080  (user: admin — connect.sh opened it)
+                           On the by-hand path, open it yourself:
+                           kubectl -n argocd port-forward svc/argocd-server 8080:443
     4. Password:           connect.sh prints it, or see `argocd_password_command`
 
     Add real hostnames instead of port-forward: docs/rung-2-real-urls.md

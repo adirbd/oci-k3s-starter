@@ -17,7 +17,9 @@
 param(
     [int]$Interval    = $(if ($env:INTERVAL)     { [int]$env:INTERVAL }     else { 300 }),
     [int]$MaxAttempts = $(if ($env:MAX_ATTEMPTS) { [int]$env:MAX_ATTEMPTS } else { 0 }),
-    [string]$Tf       = $(if ($env:TF)           { $env:TF }                else { 'tofu' }),
+    [string]$Tf       = $(if ($env:TF) { $env:TF }
+                          elseif (Get-Command tofu -ErrorAction SilentlyContinue) { 'tofu' }
+                          else { 'terraform' }),
     [string[]]$ExtraArgs = @()
 )
 
