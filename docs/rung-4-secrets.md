@@ -116,8 +116,9 @@ Check it landed:
 kubectl get clustersecretstore oci-vault
 ```
 
-After this, the bootstrap timer keeps it alive on future runs — a rebuild also applies it
-via cloud-init, so this is a one-time step.
+This is a one-time step: nothing removes the store once applied, and a **rebuilt** box
+gets it from cloud-init automatically. (The bootstrap timer does *not* re-assert it on an
+upgraded box — the file it applies was written, empty, at first boot and never changes.)
 
 ## Using it
 
