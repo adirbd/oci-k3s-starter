@@ -333,3 +333,19 @@ variable "state_bucket_name" {
   type        = string
   default     = "terraform-state"
 }
+
+# ══════════════════════════════════════════════════════════════════════════════════
+#  STATE ENCRYPTION — optional, and off by default.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+variable "state_passphrase" {
+  description = "Passphrase used to derive the AES key that encrypts Terraform state and plan files at rest. Set it via TF_VAR_state_passphrase in the environment, or in the gitignored terraform.tfvars — never in a committed file. LOSE IT AND THE STATE IS GONE, so keep it in a password manager before you enable this. Enable with scripts/enable-state-encryption.sh."
+  type        = string
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition     = var.state_passphrase == null || length(var.state_passphrase) >= 16
+    error_message = "state_passphrase must be null (off) or at least 16 characters. It derives the key that encrypts your state — anything shorter is not worth the risk of thinking it is protected."
+  }
+}

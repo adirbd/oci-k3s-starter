@@ -33,6 +33,21 @@ terraform {
   #   skip_s3_checksum            = true
   # }
 
+  # ── STATE ENCRYPTION — off by default. ─────────────────────────────────────────
+  # State is not secret-free: the generated Grafana admin password and the console's
+  # private key land in it in cleartext, whether it lives locally or in a bucket. When
+  # enabled, OpenTofu encrypts state and plan files at rest with AES-GCM, the key derived
+  # from a passphrase you supply.
+  #
+  # The encryption block itself does NOT live in this file. It lives in
+  # state-encryption.tf, which does not exist until scripts/enable-state-encryption.sh
+  # creates it. That is deliberate: the block must not be present at all when there is no
+  # passphrase, or OpenTofu crashes on the null value — a fresh clone must work with
+  # nothing set. See docs/state-and-credentials.md and the script.
+  #
+  # ⚠ LOSE THE PASSPHRASE AND THE STATE IS GONE. Keep it in a password manager before
+  # you enable this — there is no recovery.
+
   required_providers {
     oci = {
       source = "oracle/oci"

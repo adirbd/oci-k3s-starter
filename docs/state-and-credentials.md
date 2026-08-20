@@ -74,31 +74,51 @@ shape, different endpoint, `region = "auto"`, and you create the bucket and toke
 ### Encrypt it, wherever it lives
 
 Remote does not mean private: the bucket holds the same cleartext secrets. OpenTofu can
-encrypt state before it is written, with a passphrase you supply:
+encrypt state before it is written, with a passphrase you supply. One command turns it on,
+including migrating an existing plaintext state file:
+
+```bash
+export TF_VAR_state_passphrase='...'     # 16+ characters
+./scripts/enable-state-encryption.sh
+```
+
+That writes the `encryption` block to `terraform/state-encryption.tf` (gitignored — see
+below) and re-applies, so the state file is rewritten encrypted. What it writes:
 
 ```hcl
 terraform {
   encryption {
-    key_provider "pbkdf2" "passphrase" {
+    key_provider "pbkdf2" "state" {
       passphrase = var.state_passphrase   # from TF_VAR_state_passphrase
     }
     method "aes_gcm" "default" {
-      keys = key_provider.pbkdf2.passphrase
+      keys = key_provider.pbkdf2.state
     }
+    method "unencrypted" "migrate" {}
     state {
       method   = method.aes_gcm.default
-      enforced = true
+      fallback { method = method.unencrypted.migrate }
     }
     plan {
       method   = method.aes_gcm.default
-      enforced = true
+      fallback { method = method.unencrypted.migrate }
     }
   }
 }
 ```
 
+The `unencrypted` fallback is how an existing plaintext state file is read once and
+rewritten encrypted; it never causes encrypted data to be written.
+
+**Why it is a separate, gitignored file.** The encryption block must not exist when there
+is no passphrase — OpenTofu 1.12 crashes (a panic, not an error) when a `pbkdf2` key
+provider is handed a null passphrase. So the block lives in `state-encryption.tf`, which
+the script creates only after confirming the passphrase is set. A fresh clone, with
+nothing set, has no encryption block and works normally. Consequence: it is per-machine —
+enable it on each machine you run `tofu` from.
+
 ⚠ **Lose the passphrase and the state is gone.** Put it in the same password manager as
-everything else, before you enable this.
+everything else, before you enable this. There is no recovery.
 
 ---
 

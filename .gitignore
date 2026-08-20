@@ -16,6 +16,10 @@ terraform.tfvars
 # Backend config, if you use a remote backend (it holds bucket + credentials).
 backend.hcl
 
+# Created by scripts/enable-state-encryption.sh. It must NOT be committed: a clone that
+# gets the encryption block with no passphrase crashes OpenTofu. Enable it per-machine.
+state-encryption.tf
+
 # ── Secrets — never commit ─────────────────────────────────────────────────────
 *.pem
 *.key
