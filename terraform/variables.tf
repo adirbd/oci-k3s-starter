@@ -94,9 +94,13 @@ variable "ocpus" {
   # Always Free tenancy allows, "all existing OCI Ampere A1 Compute instances are disabled
   # and then deleted after 30 days" — ALL of them, not the excess. The failure is silent,
   # delayed by a month, and takes machines you did not touch.
+  #
+  # On a tenancy UPGRADED to Pay As You Go, the same overshoot BILLS instead of deleting.
+  # The cap holds on any account type on purpose: upgrading is a capacity move, not a
+  # license to build paid infrastructure — see docs/cost-and-limits.md and budget.tf.
   validation {
     condition     = var.ocpus >= 1 && var.ocpus <= 4
-    error_message = "ocpus must be 1-4. Above 4 you are outside Always Free entirely; at 3-4 you are inside it ONLY during the free trial, and exceeding the post-trial allowance of 2 deletes EVERY A1 instance in the tenancy after 30 days."
+    error_message = "ocpus must be 1-4. Above 4 you are outside Always Free entirely: on Free Tier exceeding the allowance deletes EVERY A1 instance in the tenancy after 30 days, and on Pay As You Go it bills. This repo stays inside Always Free on any account type."
   }
 }
 
@@ -107,7 +111,7 @@ variable "memory_gb" {
 
   validation {
     condition     = var.memory_gb >= 6 && var.memory_gb <= 24
-    error_message = "memory_gb must be 6-24. See the ocpus note: exceeding the post-trial allowance deletes every A1 instance in the tenancy, not just this one."
+    error_message = "memory_gb must be 6-24. See the ocpus note: on Free Tier exceeding the allowance deletes every A1 instance in the tenancy, and on Pay As You Go it bills instead."
   }
 }
 
@@ -119,6 +123,30 @@ variable "boot_volume_gb" {
   validation {
     condition     = var.boot_volume_gb >= 50 && var.boot_volume_gb <= 200
     error_message = "boot_volume_gb must be 50-200. 50 is the OCI minimum for this image; 200 is the entire Always Free block-storage allowance."
+  }
+}
+
+# ── Cost guardrails ────────────────────────────────────────────────────────────────
+
+variable "budget_alert_email" {
+  description = "Email for the zero-spend budget (budget.tf). Null (default) creates no budget — fine on a never-upgraded Free Tier, where Oracle cannot bill you at all. ⚠ SET THIS THE DAY YOU UPGRADE TO PAY AS YOU GO: the upgrade is the standard fix for 'Out of host capacity', and it silently swaps 'cannot be billed' for 'bills for the same mistake'. The shape/storage validations cap everything this repo creates inside Always Free; the budget catches what they cannot see."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.budget_alert_email == null || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.budget_alert_email))
+    error_message = "budget_alert_email must be a single email address."
+  }
+}
+
+variable "budget_monthly_limit" {
+  description = "Monthly budget amount, in the tenancy's billing currency. 1 on purpose: the point is 'tell me the moment ANYTHING bills', not cost management. OCI does not accept 0."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.budget_monthly_limit >= 1
+    error_message = "budget_monthly_limit must be at least 1 — OCI budgets do not accept smaller amounts, and for this stack 1 already means 'any spend at all is unexpected'."
   }
 }
 

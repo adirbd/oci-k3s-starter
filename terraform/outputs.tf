@@ -39,6 +39,15 @@ output "next_steps" {
   EOT
 }
 
+output "cost_guardrails" {
+  description = "What stands between you and a bill — matters most after an upgrade to Pay As You Go, which removes Oracle's cannot-bill-you safety net."
+  value = (
+    var.budget_alert_email != null
+    ? "Compute/storage capped inside Always Free by variable validation (ocpus<=4, memory<=24GB, boot<=200GB). Zero-spend budget active: ${var.budget_monthly_limit}/month, alerting ${var.budget_alert_email} on forecast and actual."
+    : "Compute/storage capped inside Always Free by variable validation (ocpus<=4, memory<=24GB, boot<=200GB). ⚠ NO budget alert — fine on Free Tier (Oracle cannot bill you); if you upgraded to Pay As You Go, set budget_alert_email."
+  )
+}
+
 # ── The break-glass door ──────────────────────────────────────────────────────────
 
 output "console_connection_id" {

@@ -43,6 +43,13 @@ oci_config_profile = "DEFAULT"
 # after you have actually used it once.
 # ssh_allowed_cidr = "203.0.113.4/32"
 
+# ⚠ Upgraded to Pay As You Go to escape "Out of host capacity"? The upgrade works —
+# paying tenancies get capacity Free Tier ones are refused — and it quietly changes one
+# rule: overshooting Always Free now BILLS instead of deleting. This repo's caps keep
+# everything IT builds free on any account type; setting an email adds a 1-unit/month
+# budget that mails you the moment ANYTHING in the compartment bills anyway.
+# budget_alert_email = "you@example.com"
+
 # Point Argo CD at your own repo. If you know you want this, SET IT NOW: the value is
 # baked into cloud-init at first boot, so changing it later does not move a running
 # cluster — you have to edit the live Application. Fork this repo, then:
