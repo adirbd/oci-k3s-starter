@@ -24,14 +24,17 @@ TF="${TF:-tofu}"; command -v "$TF" >/dev/null 2>&1 || TF=terraform
 
 REPO="${1:?usage: set-gitops-repo.sh <repo-url> [path] [instance-ip]}"
 PATH_IN_REPO="${2:-kubernetes/applications}"
-IP="${3:-$(cd "$(dirname "$0")/../terraform" && "$TF" output -raw public_ip)}"
+# No IP argument and no running box is a fine state: a fork being prepared BEFORE the
+# first apply still needs the child-Application rewrite below. The root app is covered
+# for that case by gitops_repo_url in terraform.tfvars (baked in at first boot).
+IP="${3:-$(cd "$(dirname "$0")/../terraform" && "$TF" output -raw public_ip 2>/dev/null || true)}"
 SSH_USER="${SSH_USER:-ubuntu}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "pointing Argo CD at:"
 echo "  repo: $REPO"
 echo "  path: $PATH_IN_REPO"
-echo "  box:  $IP"
+echo "  box:  ${IP:-(none found — updating the local checkout only)}"
 echo
 
 # ── the child Applications, in this checkout ──────────────────────────────────────
@@ -51,17 +54,24 @@ done
 echo
 
 # ── the root Application, on the box ──────────────────────────────────────────────
-echo "── root Application on the box"
-ssh "$SSH_USER@$IP" "sudo sed -i \
-    -e 's|repoURL: .*|repoURL: $REPO|' \
-    -e 's|path: .*|path: $PATH_IN_REPO|' \
-    /etc/k3s-starter/root-application.yaml && \
-  sudo systemctl start k3s-starter-bootstrap"
+if [ -n "$IP" ]; then
+    echo "── root Application on the box"
+    ssh "$SSH_USER@$IP" "sudo sed -i \
+        -e 's|repoURL: .*|repoURL: $REPO|' \
+        -e 's|path: .*|path: $PATH_IN_REPO|' \
+        /etc/k3s-starter/root-application.yaml && \
+      sudo systemctl start k3s-starter-bootstrap"
 
-echo
-echo "applied. Argo is now watching $REPO."
-echo "Confirm with:"
-echo "  kubectl -n argocd get application root -o jsonpath='{.spec.source}' | jq"
+    echo
+    echo "applied. Argo is now watching $REPO."
+    echo "Confirm with:"
+    echo "  kubectl -n argocd get application root -o jsonpath='{.spec.source}' | jq"
+else
+    echo "── root Application on the box: SKIPPED (no box found)"
+    echo "  Before the first apply that is correct — cloud-init bakes the root app from"
+    echo "  terraform.tfvars, so just set it there (below). For a box that IS running,"
+    echo "  re-run with the IP:  ./scripts/set-gitops-repo.sh $REPO $PATH_IN_REPO <ip>"
+fi
 if [ "$changed" -eq 1 ]; then
     echo
     echo "⚠ The child Application edits above are LOCAL. Argo reads them from git, so:"
