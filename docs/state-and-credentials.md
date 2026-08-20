@@ -128,6 +128,12 @@ everything else, before you enable this. There is no recovery.
 and stores its own token, and `flarectl` is a separate CLI — the Terraform provider reads
 neither. So the token has to reach the process yourself.
 
+**And there is no `.env` support either.** Terraform does not read `.env` files natively
+and no script in this repo sources one — a token placed there silently never reaches the
+provider (a real fork's setup assistant guessed exactly that; preflight now warns about
+it). Keep the token out of files entirely: set it in the shell session, ideally pulled
+from a password manager as shown below.
+
 ### Use the provider's own environment variable
 
 The provider reads **`CLOUDFLARE_API_TOKEN`** natively. `cf_api_token` defaults to `null`

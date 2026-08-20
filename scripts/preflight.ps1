@@ -71,6 +71,26 @@ if (Test-Path 'terraform.tfvars') {
     }
 }
 
+# A real fork's setup assistant invented terraform\.env for the Cloudflare token.
+# Nothing reads it - terraform has no native .env support and no script here sources one.
+if (Test-Path '.env') {
+    Warn ".env exists but NOTHING reads it. Put the token in the environment for this session instead: `$env:CLOUDFLARE_API_TOKEN = '...' (or TF_VAR_cf_api_token) - and do not keep tokens in a file."
+}
+
+# gitops_repo_url moves the ROOT app, but the self-sourcing child Applications carry
+# their own repoURL. If they disagree, edits to what they deploy never land (#13).
+if (Test-Path 'terraform.tfvars') {
+    $repoUrl = if ($tf -match '(?m)^\s*gitops_repo_url\s*=\s*"(.*)"') { $Matches[1] } else { $null }
+    if ($repoUrl) {
+        Get-ChildItem ..\kubernetes\applications\*.yaml, ..\kubernetes\optional\*.yaml -ErrorAction SilentlyContinue | ForEach-Object {
+            $y = Get-Content $_.FullName -Raw
+            if ($y -match '(?m)^\s*path: kubernetes/' -and $y -notmatch [regex]::Escape("repoURL: $repoUrl")) {
+                Warn "$($_.Name) sources a different repo than gitops_repo_url. Run scripts/set-gitops-repo.sh (or edit its repoURL) and commit - otherwise your changes to it never deploy."
+            }
+        }
+    }
+}
+
 Write-Host ""
 if ($fail -eq 0) { Write-Host "ready: $TF apply" } else { Write-Host "fix the FAIL lines above before applying." }
 Pop-Location
