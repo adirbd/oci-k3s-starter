@@ -262,6 +262,28 @@ Confirm what it is actually pointed at:
 kubectl -n argocd get application root -o jsonpath='{.spec.source}' | jq
 ```
 
+## Argo shows an app as "Progressing" forever
+
+This is **normal** for apps that deploy CRDs, operators, or `ExternalSecret`-backed
+resources. Argo considers the app "Progressing" until every resource reaches a Ready state,
+but CRDs and their controllers are not standard Deployments — they report Ready only after
+they have reconciled something, which can take a while or may never happen at the expected
+level.
+
+**When it is not a problem:** the pods are running, the `ExternalSecret` shows
+`SecretSynced`, and the tunnel or UI is reachable. The Progressing status is cosmetic.
+
+**When it is a problem:** the pods are crash-looping, or the `ExternalSecret` is stuck on
+`SecretStoreNotFound` / `SecretSynced=False`.
+
+Check the real status with:
+
+```bash
+kubectl -n <ns> get pods
+kubectl -n <ns> get externalsecret -o wide       # if applicable
+kubectl -n argocd get application <app> -o jsonpath='{.status.conditions}' | jq
+```
+
 ## `access.api.error.not_enabled` during apply
 
 **Cloudflare Zero Trust Access is switched off on your account.** It is an account feature
