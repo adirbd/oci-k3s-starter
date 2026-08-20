@@ -155,6 +155,38 @@ stringData:
 > a closed loop of the wrong kind — see [rung 4](rung-4-secrets.md) for where it should
 > actually live.
 
+### Keep it out of the cluster state: put it in the vault
+
+The hand-made Secret above lives in cluster state, invisible to Git, and must be re-typed
+after every rebuild. Rung 4 removes that: store the same fields as a **JSON object in OCI
+Vault** (entry name `<instance_name>-argo-repo`, e.g. `k3s-01-argo-repo`) and an
+ExternalSecret turns it into the Secret Argo reads:
+
+```
+type                    = "git"
+url                     = "https://github.com/you/your-cluster.git"
+githubAppID             = "123456"
+githubAppInstallationID = "654321"
+githubAppPrivateKey     = "-----BEGIN RSA PRIVATE KEY-----\n..."
+```
+
+Two ways to deploy that ExternalSecret — either works:
+
+- **At boot (automatic).** With `enable_vault = true`, Terraform renders it into cloud-init
+  and the box applies it on every bootstrap run — no human step, and a rebuilt cluster
+  gets it back by itself. Do nothing.
+- **From Git (durable).** Move the manifest into the repo Argo watches:
+
+  ```bash
+  cp kubernetes/optional/externalsecret-argo-repo.yaml kubernetes/applications/
+  git commit -am "argo reads its repo credential from the vault" && git push
+  ```
+
+  This has the same chicken-and-egg as the hand-made Secret — Argo cannot read a private
+  repo to fetch the credential that unlocks that repo — so it only takes effect *after*
+  the box is up and the vault entry exists. Either way the credential exists, but never
+  on a laptop, never in a shell, and never in this repository.
+
 ## A worked example
 
 [`examples/my-app.yaml`](../examples/my-app.yaml) is a complete one — Application,

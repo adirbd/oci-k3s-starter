@@ -50,8 +50,12 @@ jobs:
               argocd_version   = "$ARGOCD_VERSION"
               gitops_repo_url  = "https://example.com/repo.git"
               gitops_repo_path = "kubernetes/applications"
-              clustersecretstore     = "" # rendered by instance.tf when enable_vault is true
-              grafana_admin_password = "render-check-only"
+              # Vault OFF, the default: grafana arrives as a plaintext Secret, and the
+              # vault-dependent files render empty. indent(6,...) matches what instance.tf
+              # does (yamlencode + indent), so the value lands correctly under `content: |`.
+              grafana_admin_secret = indent(6, "apiVersion: v1\nkind: Secret\nmetadata:\n  name: grafana-admin\n  namespace: observability\ntype: Opaque\nstringData:\n  admin-user: admin\n  admin-password: render-check-only\n")
+              argo_repo_secret     = "" # rendered by instance.tf when enable_vault is true
+              clustersecretstore   = "" # rendered by instance.tf when enable_vault is true
             })
           }
           EOF

@@ -132,6 +132,7 @@ output "clustersecretstore_manifest" {
 output "vault_secret_names" {
   description = "Names of the entries Terraform put in the vault. These are what an ExternalSecret's remoteRef.key must match — they follow instance_name, so they change if you rename the box."
   value = var.enable_vault ? compact([
+    oci_vault_secret.grafana_admin[0].secret_name,
     var.enable_cloudflare ? oci_vault_secret.cloudflared_token[0].secret_name : "",
   ]) : []
 }

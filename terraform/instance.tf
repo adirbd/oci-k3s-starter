@@ -82,9 +82,102 @@ resource "oci_core_instance" "main" {
       gitops_repo_url  = var.gitops_repo_url
       gitops_repo_path = var.gitops_repo_path
 
-      # Delivered at boot so the cluster never runs on admin/admin, and so a REBUILD comes
-      # back with the same password rather than a new one nobody knows.
-      grafana_admin_password = random_password.grafana_admin.result
+      # Grafana's admin credentials. Rung 4 on: an ExternalSecret that reads the password
+      # from the vault at runtime, so it never sits in instance metadata. Rung 4 off: a
+      # plaintext Secret — the only way to deliver a password with no vault. Either way
+      # the value is the same one from state, so a rebuild comes back with the same
+      # password rather than a new one nobody knows.
+      grafana_admin_secret = var.enable_vault ? indent(6, yamlencode({
+        apiVersion = "external-secrets.io/v1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "grafana-admin"
+          namespace = "observability"
+        }
+        spec = {
+          refreshInterval = "1h"
+          secretStoreRef = {
+            name = "oci-vault"
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "grafana-admin"
+            creationPolicy = "Owner"
+            template = {
+              data = {
+                "admin-user"     = "admin"
+                "admin-password" = "{{ .password }}"
+              }
+            }
+          }
+          data = [
+            {
+              secretKey = "password"
+              remoteRef = {
+                key = "${var.instance_name}-grafana-admin"
+              }
+            },
+          ]
+        }
+        })) : indent(6, yamlencode({
+        apiVersion = "v1"
+        kind       = "Secret"
+        metadata = {
+          name      = "grafana-admin"
+          namespace = "observability"
+        }
+        type = "Opaque"
+        stringData = {
+          "admin-user"     = "admin"
+          "admin-password" = random_password.grafana_admin.result
+        }
+      }))
+
+      # Argo CD's private-repo credential, delivered as an ExternalSecret when rung 4 is
+      # on. Empty when it is off — the box skips a blank file. The vault entry is created
+      # by hand (see docs/rung-3-your-app.md); the box only reads it, so the credential
+      # never sits in metadata either. The key name follows instance_name, like the
+      # cloudflared token.
+      argo_repo_secret = var.enable_vault ? indent(6, yamlencode({
+        apiVersion = "external-secrets.io/v1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "repo-my-cluster"
+          namespace = "argocd"
+        }
+        spec = {
+          refreshInterval = "1h"
+          secretStoreRef = {
+            name = "oci-vault"
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "repo-my-cluster"
+            creationPolicy = "Owner"
+            template = {
+              metadata = {
+                labels = {
+                  "argocd.argoproj.io/secret-type" = "repository"
+                }
+              }
+              data = {
+                type                    = "{{ .type }}"
+                url                     = "{{ .url }}"
+                githubAppID             = "{{ .githubAppID }}"
+                githubAppInstallationID = "{{ .githubAppInstallationID }}"
+                githubAppPrivateKey     = "{{ .githubAppPrivateKey }}"
+              }
+            }
+          }
+          dataFrom = [
+            {
+              extract = {
+                key = "${var.instance_name}-argo-repo"
+              }
+            },
+          ]
+        }
+      })) : ""
 
       # Rendered here so the box can apply it itself at boot, rather than a human pasting
       # `tofu output clustersecretstore_manifest` into kubectl — a step that is easy to skip

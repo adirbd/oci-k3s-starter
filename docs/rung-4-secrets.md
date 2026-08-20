@@ -164,6 +164,32 @@ Git, a rebuilt cluster recreates it without anyone typing anything.
 Order matters: External Secrets and the ClusterSecretStore have to exist first, so do the
 steps above this section before this one.
 
+## What rung 4 does to the credentials you already have
+
+Enabling rung 4 stops two secrets from ever touching instance metadata, because Terraform
+switches how they are delivered (see [rung 1](rung-1-the-box.md) and
+[rung 3](rung-3-your-app.md)):
+
+- **Grafana's admin password** — written to the vault and delivered as an `ExternalSecret`
+  that reads it at runtime, instead of a plaintext Secret baked into cloud-init. With
+  rung 4 off it is still delivered as a plaintext Secret (the only way to get a password
+  to a box with no vault), and it still lands in Terraform state either way.
+- **Argo's private-repo credential** — stored as a JSON object in the vault and read as an
+  `ExternalSecret`, instead of a hand-made plaintext Secret. The box can read it before it
+  can read your private repo (that is the point of instance principal), so there is no
+  chicken-and-egg.
+
+Both files are rendered into cloud-init only when `enable_vault = true`; the box applies
+them on its own every bootstrap run, so a rebuilt cluster gets them back without a human.
+The value never sits in metadata — which is the difference the first rung's caveat was
+about.
+
+> ⚠ **One secret still lives in state.** Terraform cannot avoid recording the Grafana
+> password and the console's private key in `terraform.tfstate` (they are generated, and
+> state is where generated values live). Rung 4 moves them out of *metadata*; it does not
+> move them out of *state*. The tool for that is state encryption — see
+> [state-and-credentials.md](state-and-credentials.md#encrypt-it-wherever-it-lives).
+
 ## Deliberate limits
 
 - **Read-only.** The policy grants `read secret-family` — listing and reading. The box

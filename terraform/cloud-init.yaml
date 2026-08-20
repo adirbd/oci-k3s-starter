@@ -71,24 +71,22 @@ write_files:
           syncOptions:
             - CreateNamespace=true
 
-  # Grafana's admin credentials, delivered to the cluster rather than left at admin/admin.
+  # Grafana's admin credentials, delivered as a Secret so the cluster never runs on
+  # admin/admin.
   #
-  # ⚠ THIS PUTS THE PASSWORD IN INSTANCE METADATA, which anything running ON the box can
-  # read via 169.254.169.254. That is a real exposure and worth stating plainly — but it is
-  # the same audience that can already read the Kubernetes Secret directly, so it does not
-  # widen who can see it. It is not visible from outside the instance.
+  # WHAT IS IN THIS FILE DEPENDS ON WHETHER RUNG 4 IS ON (terraform renders it):
+  #   - rung 4 OFF: a plaintext Secret. The password is baked into instance metadata,
+  #     which anything running ON the box can read via 169.254.169.254. That is a real
+  #     exposure and worth stating plainly — but it is the same audience that can already
+  #     read the Kubernetes Secret directly, so it does not widen who can see it. It is
+  #     not visible from outside the instance.
+  #   - rung 4 ON: an ExternalSecret that reads the password from OCI Vault at runtime.
+  #     The password is NOT in metadata at all — the box proves its own identity to the
+  #     vault, and the value never touches this file or this disk.
   - path: /etc/k3s-starter/grafana-admin.yaml
     permissions: "0600"
     content: |
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: grafana-admin
-        namespace: observability
-      type: Opaque
-      stringData:
-        admin-user: admin
-        admin-password: "${grafana_admin_password}"
+      ${grafana_admin_secret}
 
   # Empty unless enable_vault = true — instance.tf passes "" and this stays a blank file
   # the bootstrap skips.
@@ -96,6 +94,15 @@ write_files:
     permissions: "0644"
     content: |
       ${clustersecretstore}
+
+  # Argo CD's private-repo credential, as an ExternalSecret when rung 4 is on. Empty
+  # otherwise, and the bootstrap skips a blank file. The vault entry is created by hand
+  # (docs/rung-3-your-app.md) — the box only reads it, so the credential never sits in
+  # metadata either.
+  - path: /etc/k3s-starter/argo-repo-secret.yaml
+    permissions: "0600"
+    content: |
+      ${argo_repo_secret}
 
   - path: /usr/local/sbin/k3s-starter-bootstrap.sh
     permissions: "0755"
@@ -176,19 +183,6 @@ write_files:
       log "asserting the root application"
       kubectl apply -f /etc/k3s-starter/root-application.yaml
 
-      # ── Grafana's password ───────────────────────────────────────────────────────
-      # Applied every run, before Argo installs Grafana: the chart is configured with
-      # admin.existingSecret, so the Secret has to exist or the pod waits for it. Creating
-      # the namespace here is harmless — Argo creates it too, and both are idempotent.
-      # ⚠ IF YOU ADD A FILE HERE, IT ONLY REACHES BOXES BUILT AFTERWARDS.
-      # cloud-init runs once. A box that booted before a file existed will never have it,
-      # its apply will still be green, and the failure shows up as a pod stuck in
-      # CreateContainerConfigError referring to something absent (#22). Anything added here
-      # needs a line in README's "Updating" section saying how to create it by hand.
-      log "asserting the Grafana admin secret"
-      kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-      kubectl apply -f /etc/k3s-starter/grafana-admin.yaml
-
       # ── the vault store, when rung 4 is on ───────────────────────────────────────
       # Applied here rather than by hand (#12). External Secrets needs a ClusterSecretStore
       # before any ExternalSecret resolves, and asking a human to paste one from a terraform
@@ -199,9 +193,52 @@ write_files:
       # grep for content, not `[ -s ]`: with enable_vault off the template renders an
       # empty block and the written file still holds one newline, which counts as
       # "non-empty" — and a kubectl apply on it logs a spurious retry line every 15 min.
+      #
+      # Deliberately BEFORE the secrets below: the ExternalSecrets it stores for reference
+      # resolve only once this store exists.
       if grep -q '[^[:space:]]' /etc/k3s-starter/clustersecretstore.yaml 2>/dev/null; then
         log "asserting the OCI Vault ClusterSecretStore"
         kubectl apply -f /etc/k3s-starter/clustersecretstore.yaml || \
+          log "  (external-secrets CRDs not present yet — will retry next run)"
+      fi
+
+      # ── Grafana's credentials ────────────────────────────────────────────────────
+      # Applied every run, before Argo installs Grafana: the chart is configured with
+      # admin.existingSecret, so the Secret has to exist or the pod waits for it. Creating
+      # the namespace here is harmless — Argo creates it too, and both are idempotent.
+      #
+      # Rung 4 off, this file holds a plaintext Secret and must apply cleanly from the
+      # first run (the password has to exist or Grafana's pod waits forever) — so a
+      # failure here is a real error and aborts. Rung 4 on, it holds an ExternalSecret,
+      # which needs the operator's CRDs and the ClusterSecretStore above; on a fresh box
+      # those may not be up yet, so the first attempt is allowed to fail and the timer
+      # retries it — the comment before the apply says which mode is live.
+      #
+      # ⚠ IF YOU ADD A FILE HERE, IT ONLY REACHES BOXES BUILT AFTERWARDS.
+      # cloud-init runs once. A box that booted before a file existed will never have it,
+      # its apply will still be green, and the failure shows up as a pod stuck in
+      # CreateContainerConfigError referring to something absent (#22). Anything added here
+      # needs a line in README's "Updating" section saying how to create it by hand.
+      log "asserting the Grafana admin secret"
+      kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+      if grep -q 'external-secrets.io' /etc/k3s-starter/grafana-admin.yaml; then
+        # Rung 4 on: ExternalSecret — tolerates the CRDs/store not being up yet.
+        kubectl apply -f /etc/k3s-starter/grafana-admin.yaml || \
+          log "  (external-secrets CRDs not present yet — will retry next run)"
+      else
+        # Rung 4 off: plaintext Secret — must exist, or Grafana's pod waits forever.
+        kubectl apply -f /etc/k3s-starter/grafana-admin.yaml
+      fi
+
+      # ── Argo's private-repo credential, when rung 4 is on ────────────────────────
+      # The vault entry is created by hand; this ExternalSecret turns it into the Secret
+      # Argo reads to authenticate against a private gitops repo. Harmless before the
+      # entry exists: it fails and the timer retries. It is deliberately NOT delivered
+      # from the gitops repo — Argo cannot read a private repo to fetch the credential
+      # that unlocks it, so this comes from the box itself.
+      if grep -q '[^[:space:]]' /etc/k3s-starter/argo-repo-secret.yaml 2>/dev/null; then
+        log "asserting the Argo repo ExternalSecret"
+        kubectl apply -f /etc/k3s-starter/argo-repo-secret.yaml || \
           log "  (external-secrets CRDs not present yet — will retry next run)"
       fi
 
