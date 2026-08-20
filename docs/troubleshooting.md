@@ -171,20 +171,6 @@ In order:
 3. **Rebuild.** Everything here is declared; `tofu apply -replace=oci_core_instance.main`
    gets you a fresh box. This is only cheap if you were not storing state on it.
 
-## `connect.sh` uses the wrong server or kubectl says the connection is refused
-
-The kubeconfig points at the **public IP** instead of `127.0.0.1`. This happens when an
-older version of `connect.sh` rewrote it, or when you copied one by hand. The port is closed
-on the public side, and k3s's API certificate carries a `127.0.0.1` SAN, so even an open
-port would fail TLS verification.
-
-`connect.sh` / `connect.ps1` now detects this and re-fetches automatically. If you are
-running kubectl by hand, delete the stale kubeconfig and let the script fetch a fresh one:
-
-```bash
-rm -f kubeconfig && ./scripts/connect.sh
-```
-
 ## kubectl hangs forever and never returns
 
 Not refused — **hangs**, which is the tell. The Kubernetes API on 6443 is not open to the
@@ -232,6 +218,11 @@ is still a refusal, k3s itself is not listening yet — watch the bootstrap fini
 ```bash
 ssh ubuntu@<ip> 'sudo journalctl -u k3s-starter-bootstrap -f'
 ```
+
+A second cause: the kubeconfig itself points at the **public IP** — an old version of this
+repo generated those (#9), and hand-copied ones exist too. The connect scripts notice and
+re-fetch on their own; running kubectl by hand, delete the stale file and let the script
+fetch a fresh one: `rm -f kubeconfig && ./scripts/connect.sh`
 
 ## Argo is up but no apps appear at all
 

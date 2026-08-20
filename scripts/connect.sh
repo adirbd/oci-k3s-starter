@@ -32,8 +32,10 @@ trap cleanup EXIT
 stale=false
 if [ ! -s "$KUBECONFIG_PATH" ]; then
     stale=true
-elif grep -q 'server: https://[^1]*' "$KUBECONFIG_PATH" 2>/dev/null; then
-    echo "kubeconfig points at the wrong server (not 127.0.0.1) — refetching"
+elif ! grep -q 'server: https://127.0.0.1:6443' "$KUBECONFIG_PATH" 2>/dev/null; then
+    # Positive check, not a wrong-server pattern: public IPs can start with 1 too
+    # (130.61.x.x is an OCI range), and a negated character class quietly misses them.
+    echo "kubeconfig does not point at 127.0.0.1 (an old version rewrote these) — refetching"
     stale=true
 fi
 if [ "$stale" = true ]; then

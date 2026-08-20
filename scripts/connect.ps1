@@ -37,8 +37,9 @@ if (-not $IP) {
 $stale = $false
 if (-not (Test-Path $KubeconfigPath) -or (Get-Item $KubeconfigPath).Length -eq 0) {
     $stale = $true
-} elseif (Select-String -Path $KubeconfigPath -Pattern 'server: https://[^1]' -Quiet) {
-    Write-Host "kubeconfig points at the wrong server (not 127.0.0.1) - refetching"
+} elseif (-not (Select-String -Path $KubeconfigPath -Pattern 'server: https://127\.0\.0\.1:6443' -Quiet)) {
+    # Positive check, not a wrong-server pattern: public IPs can start with 1 too.
+    Write-Host "kubeconfig does not point at 127.0.0.1 (an old version rewrote these) - refetching"
     $stale = $true
 }
 if ($stale) {
