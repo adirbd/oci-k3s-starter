@@ -33,7 +33,15 @@ if (-not $IP) {
 
 # Length check, not just existence: an earlier failed fetch (k3s not up yet) must not
 # leave an empty file behind that every later run trusts. Only write on a good fetch.
+# Also detect a stale kubeconfig that points at the wrong server (not 127.0.0.1).
+$stale = $false
 if (-not (Test-Path $KubeconfigPath) -or (Get-Item $KubeconfigPath).Length -eq 0) {
+    $stale = $true
+} elseif (Select-String -Path $KubeconfigPath -Pattern 'server: https://[^1]' -Quiet) {
+    Write-Host "kubeconfig points at the wrong server (not 127.0.0.1) - refetching"
+    $stale = $true
+}
+if ($stale) {
     Write-Host "fetching kubeconfig from $IP"
     # No rewriting: 127.0.0.1 is correct, because everything goes through the tunnel below.
     $kc = ssh "$SshUser@$IP" 'sudo cat /etc/rancher/k3s/k3s.yaml'
