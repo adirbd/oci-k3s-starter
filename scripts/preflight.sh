@@ -81,6 +81,28 @@ if [ "${enabled:-0}" -gt 0 ] && [ "${emails:-0}" -gt 0 ]; then
     fi
 fi
 
+# ── a .env file does nothing here ────────────────────────────────────────────
+# A real fork's setup assistant invented terraform/.env for the Cloudflare token.
+# Nothing reads it — terraform has no native .env support and no script here sources
+# one — so a token in it silently never reaches the provider.
+if [ -f .env ]; then
+    warn ".env exists but NOTHING reads it. Put the token in the environment for this session instead: export CLOUDFLARE_API_TOKEN=... (or TF_VAR_cf_api_token) — and do not keep tokens in a file."
+fi
+
+# ── the fork actually points at itself ───────────────────────────────────────
+# gitops_repo_url moves the ROOT app, but the self-sourcing child Applications carry
+# their own repoURL (see set-gitops-repo.sh). If they disagree, your edits to what they
+# deploy never land, and the other repo keeps syncing into your cluster (#13).
+repo_url=$(grep -E '^\s*gitops_repo_url' terraform.tfvars 2>/dev/null | sed 's/.*=[[:space:]]*"\(.*\)".*/\1/')
+if [ -n "$repo_url" ]; then
+    for f in ../kubernetes/applications/*.yaml ../kubernetes/optional/*.yaml; do
+        [ -f "$f" ] || continue
+        grep -qE '^[[:space:]]*path: kubernetes/' "$f" || continue
+        grep -qF "repoURL: $repo_url" "$f" \
+            || warn "$(basename "$f") sources a different repo than gitops_repo_url. Run scripts/set-gitops-repo.sh (or edit its repoURL) and commit — otherwise your changes to it never deploy."
+    done
+fi
+
 echo
 [ "$fail" -eq 0 ] && echo "ready: $TF apply" || echo "fix the FAIL lines above before applying."
 exit "$fail"
