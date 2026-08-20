@@ -71,9 +71,6 @@ spec:
               - Cluster:
                   style: row
                   columns: 2
-              - Your apps:
-                  style: row
-                  columns: 2
 
           services:
             - Cluster:
@@ -85,8 +82,6 @@ spec:
                     description: metrics — the box, the cluster, your app
                     icon: grafana
                     href: https://grafana.danieliyahu.com
-
-            - Your apps:
 
           widgets:
             - kubernetes:
