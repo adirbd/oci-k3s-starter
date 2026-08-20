@@ -100,6 +100,26 @@ git commit -am "add external secrets" && git push
 The manifest is generated with your vault OCID and region already in it, so there is
 nothing to paste.
 
+### Upgrading an existing box
+
+If the box was built **before** you enabled rung 4, cloud-init already ran and did not
+deliver the ClusterSecretStore. The `tofu apply` created the vault and IAM objects, but the
+store has to be applied by hand once:
+
+```bash
+tofu output -raw clustersecretstore_manifest | kubectl apply -f -
+```
+
+Check it landed:
+
+```bash
+kubectl get clustersecretstore oci-vault
+```
+
+This is a one-time step: nothing removes the store once applied, and a **rebuilt** box
+gets it from cloud-init automatically. (The bootstrap timer does *not* re-assert it on an
+upgraded box — the file it applies was written, empty, at first boot and never changes.)
+
 ## Using it
 
 Put a secret in the vault (console → Identity & Security → Vault → Secrets, or the CLI),
