@@ -46,9 +46,10 @@ oci_user_ocid       = "ocid1.user.oc1..aaaa..."   # Profile menu > your username
 ```
 
 That creates the bucket (versioned, private), generates an S3 **Customer Secret Key**, writes
-`backend.hcl`, and runs `tofu init -migrate-state`. The only thing it cannot do for you is
-uncomment the `backend "s3" {}` block in `versions.tf`; it stops and tells you when it gets
-there.
+`backend.hcl`, adds the empty `backend "s3" {}` block to `versions.tf` itself, and runs
+`tofu init -migrate-state` — one run, no seam. Leave the backend block alone beforehand:
+the script inserts it at the right moment, and stops with instructions if it finds one
+already declared by hand.
 
 **Why `oci_user_ocid` is the one thing you have to paste:** a Customer Secret Key belongs to
 a user, and a browser session does not tell Terraform which human is driving it. Everything

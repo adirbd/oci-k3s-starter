@@ -20,6 +20,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-$REPO_ROOT/kubeconfig}"
 SSH_USER="${SSH_USER:-ubuntu}"
 
+# The trap is registered BEFORE the fetch: a Ctrl-C during a hung ssh must not leave a
+# half-written admin kubeconfig behind (the temp name is also covered by .gitignore).
+tmp=""
+cleanup() { [ -n "$tmp" ] && rm -f "$tmp"; kill 0 2>/dev/null || true; }
+trap cleanup EXIT
+
 # -s, not -f: an earlier failed fetch (k3s not up yet) must not leave an empty file
 # behind that every later run trusts. Fetch to a temp file and move it only on success,
 # so a half-written kubeconfig can never poison the next attempt.
@@ -29,8 +35,8 @@ if [ ! -s "$KUBECONFIG_PATH" ]; then
     if ssh "$SSH_USER@$IP" 'sudo cat /etc/rancher/k3s/k3s.yaml' > "$tmp" && [ -s "$tmp" ]; then
         chmod 600 "$tmp"
         mv "$tmp" "$KUBECONFIG_PATH"
+        tmp=""
     else
-        rm -f "$tmp"
         echo
         echo "could not fetch the kubeconfig — k3s is probably still installing."
         echo "  watch it:   ssh $SSH_USER@$IP 'sudo journalctl -u k3s-starter-bootstrap -f'"
@@ -39,9 +45,6 @@ if [ ! -s "$KUBECONFIG_PATH" ]; then
     fi
 fi
 export KUBECONFIG="$KUBECONFIG_PATH"
-
-cleanup() { kill 0 2>/dev/null || true; }
-trap cleanup EXIT
 
 echo "opening SSH tunnel to the Kubernetes API (6443)"
 ssh -N -L 6443:127.0.0.1:6443 "$SSH_USER@$IP" &
