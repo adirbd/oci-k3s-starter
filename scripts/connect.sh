@@ -29,7 +29,16 @@ trap cleanup EXIT
 # -s, not -f: an earlier failed fetch (k3s not up yet) must not leave an empty file
 # behind that every later run trusts. Fetch to a temp file and move it only on success,
 # so a half-written kubeconfig can never poison the next attempt.
+stale=false
 if [ ! -s "$KUBECONFIG_PATH" ]; then
+    stale=true
+elif ! grep -q 'server: https://127.0.0.1:6443' "$KUBECONFIG_PATH" 2>/dev/null; then
+    # Positive check, not a wrong-server pattern: public IPs can start with 1 too
+    # (130.61.x.x is an OCI range), and a negated character class quietly misses them.
+    echo "kubeconfig does not point at 127.0.0.1 (an old version rewrote these) — refetching"
+    stale=true
+fi
+if [ "$stale" = true ]; then
     echo "fetching kubeconfig from $IP"
     tmp="$(mktemp "$KUBECONFIG_PATH.XXXXXX")"
     if ssh "$SSH_USER@$IP" 'sudo cat /etc/rancher/k3s/k3s.yaml' > "$tmp" && [ -s "$tmp" ]; then

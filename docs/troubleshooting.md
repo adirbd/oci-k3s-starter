@@ -219,6 +219,11 @@ is still a refusal, k3s itself is not listening yet — watch the bootstrap fini
 ssh ubuntu@<ip> 'sudo journalctl -u k3s-starter-bootstrap -f'
 ```
 
+A second cause: the kubeconfig itself points at the **public IP** — an old version of this
+repo generated those (#9), and hand-copied ones exist too. The connect scripts notice and
+re-fetch on their own; running kubectl by hand, delete the stale file and let the script
+fetch a fresh one: `rm -f kubeconfig && ./scripts/connect.sh`
+
 ## Argo is up but no apps appear at all
 
 Look at the root Application first:
