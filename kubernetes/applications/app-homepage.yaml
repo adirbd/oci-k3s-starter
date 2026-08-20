@@ -87,7 +87,10 @@ spec:
                     href: http://localhost:3001
 
             - Your apps:
-                # podinfo, from app-sample.yaml. Delete this entry when you delete that.
+                # podinfo, from app-sample.yaml. Deleting that? Take this WHOLE group with
+                # it — here AND in layout above. A group with no entries renders as null,
+                # and one null group crashes EVERY tile on the page, not just this section
+                # (#30). check-apps.py fails CI on it, so a fork finds out before the box.
                 - Sample (podinfo):
                     description: proof the cluster works — delete me
                     icon: kubernetes

@@ -82,17 +82,32 @@ def assert_vm_stack(docs):
 def assert_homepage(docs):
     problems = []
     for cm in (d for d in docs if d["kind"] == "ConfigMap"):
-        settings = (cm.get("data") or {}).get("settings.yaml")
-        if not settings:
-            continue
-        layout = yaml.safe_load(settings).get("layout")
-        # Helm's toYaml SORTS MAP KEYS. A map here is silently reordered on render and the
-        # file stops describing the page. Only a list survives.
-        if not isinstance(layout, list):
-            problems.append(
-                f"settings.yaml layout rendered as {type(layout).__name__}, expected list — "
-                "a map is alphabetised by Helm and your ordering is lost"
-            )
+        data = cm.get("data") or {}
+
+        settings = data.get("settings.yaml")
+        if settings:
+            layout = yaml.safe_load(settings).get("layout")
+            # Helm's toYaml SORTS MAP KEYS. A map here is silently reordered on render and
+            # the file stops describing the page. Only a list survives.
+            if not isinstance(layout, list):
+                problems.append(
+                    f"settings.yaml layout rendered as {type(layout).__name__}, expected list — "
+                    "a map is alphabetised by Helm and your ordering is lost"
+                )
+
+        # An EMPTY group renders as `- Your apps: null`, and Homepage's renderer does
+        # group.forEach(...) on it — one null group and the WHOLE services section fails
+        # to load, every tile gone, not just that group (#30). The trap is armed by our
+        # own advice: deleting podinfo empties "Your apps" unless the group goes too.
+        services = yaml.safe_load(data.get("services.yaml") or "") or []
+        for group in services:
+            for group_name, entries in group.items():
+                if not entries:
+                    problems.append(
+                        f"services group '{group_name}' is empty — it renders as null and "
+                        "crashes ALL of Homepage's tiles (#30). Remove the whole group, "
+                        "from services AND from layout, not just its entries."
+                    )
     return problems
 
 
