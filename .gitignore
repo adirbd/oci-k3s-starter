@@ -23,6 +23,7 @@ backend.hcl
 .env
 .env.*
 kubeconfig
+kubeconfig.*
 *.kubeconfig
 
 # ── OS / editor ────────────────────────────────────────────────────────────────

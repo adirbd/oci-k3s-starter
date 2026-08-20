@@ -9,8 +9,8 @@ output "ssh" {
 }
 
 output "kubeconfig_command" {
-  description = "Fetch the cluster's kubeconfig to your machine. The sed rewrites the server address from 127.0.0.1 (correct on the box, useless from your laptop) to the public IP."
-  value       = "ssh ubuntu@${oci_core_instance.main.public_ip} 'sudo cat /etc/rancher/k3s/k3s.yaml' | sed 's/127.0.0.1/${oci_core_instance.main.public_ip}/' > kubeconfig && export KUBECONFIG=$PWD/kubeconfig"
+  description = "Fetch the cluster's kubeconfig, unmodified, and open the SSH tunnel kubectl needs. The server stays 127.0.0.1 ON PURPOSE: 6443 is not open to the internet, and the API certificate carries a 127.0.0.1 SAN, so rewriting it to the public IP cannot work (#9). scripts/connect.sh does all of this, plus the port-forwards."
+  value       = "ssh ubuntu@${oci_core_instance.main.public_ip} 'sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig && export KUBECONFIG=$PWD/kubeconfig && ssh -f -N -L 6443:127.0.0.1:6443 ubuntu@${oci_core_instance.main.public_ip}"
 }
 
 output "argocd_password_command" {
@@ -21,12 +21,19 @@ output "argocd_password_command" {
 output "next_steps" {
   description = "What to do once apply finishes."
   value       = <<-EOT
-    1. Fetch kubeconfig:   see the `kubeconfig_command` output
-    2. Watch it come up:   kubectl get pods -A -w
+    1. Get in:             ../scripts/connect.sh   (connect.ps1 on Windows)
+                           It fetches the kubeconfig, opens the SSH tunnel — the only
+                           way in; 6443 is deliberately closed — and port-forwards
+                           every UI, then stays running. Leave it up.
+                           By hand instead: the `kubeconfig_command` output.
+    2. In a SECOND shell:  export KUBECONFIG=$PWD/../kubeconfig
+                           (connect.sh wrote it to the repo root), then watch it come up:
+                           kubectl get pods -A -w
        (the bootstrap timer runs every 15 min, so a slow first boot catches up on its own)
-    3. Argo CD UI:         kubectl -n argocd port-forward svc/argocd-server 8080:443
-                           then https://localhost:8080  (user: admin)
-    4. Password:           see the `argocd_password_command` output
+    3. Argo CD UI:         https://localhost:8080  (user: admin — connect.sh opened it)
+                           On the by-hand path, open it yourself:
+                           kubectl -n argocd port-forward svc/argocd-server 8080:443
+    4. Password:           connect.sh prints it, or see `argocd_password_command`
 
     Add real hostnames instead of port-forward: docs/rung-2-real-urls.md
   EOT
@@ -140,4 +147,35 @@ output "access_aud_tags" {
   value = {
     for k, app in cloudflare_zero_trust_access_application.protected : k => app.aud
   }
+}
+
+# ── Remote state (null unless enable_remote_state = true) ─────────────────────────
+
+output "state_backend_config" {
+  description = "The backend block for terraform/versions.tf, filled in. scripts/enable-remote-state.sh writes this for you."
+  value = var.enable_remote_state ? join("\n", [
+    "bucket = \"${var.state_bucket_name}\"",
+    "key    = \"${var.instance_name}/terraform.tfstate\"",
+    "region = \"${var.region}\"",
+    "",
+    "endpoints = { s3 = \"https://${try(data.oci_objectstorage_namespace.ns[0].namespace, "")}.compat.objectstorage.${var.region}.oraclecloud.com\" }",
+    "",
+    "skip_credentials_validation = true",
+    "skip_region_validation      = true",
+    "skip_requesting_account_id  = true",
+    "skip_s3_checksum            = true",
+    "use_path_style              = true",
+  ]) : "(set enable_remote_state = true first)"
+}
+
+output "state_s3_access_key_id" {
+  description = "AWS_ACCESS_KEY_ID for the state bucket."
+  value       = var.enable_remote_state ? oci_identity_customer_secret_key.state[0].id : null
+  sensitive   = true
+}
+
+output "state_s3_secret_access_key" {
+  description = "AWS_SECRET_ACCESS_KEY for the state bucket. Returned once at creation and kept in state thereafter."
+  value       = var.enable_remote_state ? oci_identity_customer_secret_key.state[0].key : null
+  sensitive   = true
 }

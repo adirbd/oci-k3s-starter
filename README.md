@@ -214,6 +214,32 @@ Grafana password and the console private key in cleartext. For the token, export
 **`CLOUDFLARE_API_TOKEN`** (the provider reads it natively) from your password manager at
 the start of a session, rather than writing it to a file.
 
+## Updating
+
+`git pull` then `tofu apply` picks up most changes — anything in `kubernetes/` is Argo's
+job, and anything Terraform manages it will reconcile.
+
+**One category does not work that way.** A few things are delivered by **cloud-init**, which
+runs *once, at first boot*: the root Application, the Grafana admin Secret, the vault store.
+If a new version adds one, your apply succeeds and your running box simply never receives
+it — the symptom is usually a pod stuck in `CreateContainerConfigError` referring to
+something that does not exist.
+
+Two ways forward, in this order:
+
+1. **Create the missing thing by hand.** It is normally one `kubectl` command, and
+   [troubleshooting](docs/troubleshooting.md#a-pod-says-createcontainerconfigerror-after-pulling-a-new-version)
+   has the shape of it.
+2. **Rebuild deliberately** — `tofu apply -replace=oci_core_instance.main` re-runs cloud-init
+   and picks up everything.
+
+> ⚠ **Rebuilding is not free on a free tier.** `-replace` destroys the instance *before*
+> creating its replacement, and Ampere capacity is not reserved — you may wait hours for
+> another. Fix in place unless you were willing to lose the box.
+
+The box is disposable by design, but "disposable" assumes you can get another one, and on
+Always Free that is a hope rather than a guarantee.
+
 ## Removing it
 
 ```bash

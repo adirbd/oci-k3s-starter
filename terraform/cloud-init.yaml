@@ -180,6 +180,11 @@ write_files:
       # Applied every run, before Argo installs Grafana: the chart is configured with
       # admin.existingSecret, so the Secret has to exist or the pod waits for it. Creating
       # the namespace here is harmless — Argo creates it too, and both are idempotent.
+      # ⚠ IF YOU ADD A FILE HERE, IT ONLY REACHES BOXES BUILT AFTERWARDS.
+      # cloud-init runs once. A box that booted before a file existed will never have it,
+      # its apply will still be green, and the failure shows up as a pod stuck in
+      # CreateContainerConfigError referring to something absent (#22). Anything added here
+      # needs a line in README's "Updating" section saying how to create it by hand.
       log "asserting the Grafana admin secret"
       kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
       kubectl apply -f /etc/k3s-starter/grafana-admin.yaml
@@ -191,7 +196,10 @@ write_files:
       #
       # Harmless before the operator exists: the apply fails while the CRD is absent, and
       # the timer retries in fifteen minutes, by which time Argo has deployed it.
-      if [ -s /etc/k3s-starter/clustersecretstore.yaml ]; then
+      # grep for content, not `[ -s ]`: with enable_vault off the template renders an
+      # empty block and the written file still holds one newline, which counts as
+      # "non-empty" — and a kubectl apply on it logs a spurious retry line every 15 min.
+      if grep -q '[^[:space:]]' /etc/k3s-starter/clustersecretstore.yaml 2>/dev/null; then
         log "asserting the OCI Vault ClusterSecretStore"
         kubectl apply -f /etc/k3s-starter/clustersecretstore.yaml || \
           log "  (external-secrets CRDs not present yet — will retry next run)"

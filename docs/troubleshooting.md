@@ -202,15 +202,22 @@ Test-NetConnection <ip> -Port 6443    # False — this is correct
 
 ## kubectl says the connection is refused
 
-The kubeconfig on the box points at `127.0.0.1`, which is correct *there* and useless from
-your laptop. Rewrite it:
+kubectl is pointed at `127.0.0.1:6443` with no tunnel carrying it there. The address is
+correct — **do not rewrite it to the public IP**; as the section above explains, the port
+is closed and the certificate would fail even if it were open. What is missing is the
+tunnel:
 
 ```bash
-ssh ubuntu@<ip> 'sudo cat /etc/rancher/k3s/k3s.yaml' | sed 's/127.0.0.1/<ip>/' > kubeconfig
+ssh -N -L 6443:127.0.0.1:6443 ubuntu@<ip> &
+export KUBECONFIG=$PWD/kubeconfig
 ```
 
-Note this reaches the API server over the public internet. Fine for one developer with a
-narrow `ssh_allowed_cidr`; not what you want long-term. Rung 2 and Tailscale both fix it.
+`./scripts/connect.sh` (or `connect.ps1`) does both. If the tunnel is up and the answer
+is still a refusal, k3s itself is not listening yet — watch the bootstrap finish:
+
+```bash
+ssh ubuntu@<ip> 'sudo journalctl -u k3s-starter-bootstrap -f'
+```
 
 ## Argo is up but no apps appear at all
 
@@ -250,6 +257,39 @@ permission. The token is fine.
 Enable it once at <https://one.dash.cloudflare.com> — it asks you to pick a team domain —
 then re-run `tofu apply`. Everything already created stays; the apply continues from where
 it stopped.
+
+## A pod says `CreateContainerConfigError` after pulling a new version
+
+It is referring to a Secret or ConfigMap that does not exist on your box.
+
+**Why it happens.** Some things are delivered by **cloud-init**, which runs *once, at first
+boot*. If you pull a version of this repo that adds one — a new Secret, a new file under
+`/etc/k3s-starter/` — your Terraform apply succeeds, the chart starts expecting it, and your
+already-running box never received it. The apply is green and the failure is in pod status.
+
+Find out what is missing:
+
+```bash
+kubectl -n <namespace> describe pod <pod> | tail -20
+```
+
+**Fix it in place** — the safe option, and usually a one-liner. For the `grafana-admin`
+Secret, for example:
+
+```bash
+kubectl -n observability create secret generic grafana-admin   --from-literal=admin-user=admin   --from-literal=admin-password="$(cd terraform && tofu output -raw grafana_admin_password)"
+```
+
+**Or rebuild the box**, which re-runs cloud-init from scratch and picks up everything:
+
+```bash
+tofu apply -replace=oci_core_instance.main
+```
+
+> ⚠ **Rebuilding is not free on a free tier.** `-replace` destroys the instance before
+> creating the new one, and Ampere capacity is not reserved — you may not get one back for
+> hours. Prefer fixing in place, and rebuild only when you were willing to lose the box
+> anyway. See [Updating](../README.md#updating).
 
 ## My pod says `exec format error`
 

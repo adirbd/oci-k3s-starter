@@ -9,7 +9,8 @@ Two kinds of thing live here. **Only the first is for you.**
 | `preflight.sh` / `.ps1` | check tools, tfvars, OCI session and Cloudflare Access before applying |
 | `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
 | `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
-| `set-gitops-repo.sh` | point Argo CD at a different repo on a running box |
+| `set-gitops-repo.sh` | point Argo CD at a different repo — the root app on the running box, and the child Applications in this checkout |
+| `enable-remote-state.sh` | move Terraform state off your laptop into your own OCI bucket |
 
 ```bash
 ./scripts/retry-apply.sh      # when apply says "Out of host capacity"
@@ -21,9 +22,9 @@ answer when asking for a free ARM box, and Oracle offers no queue and no notific
 asking again. It rotates availability domains (capacity is tracked per-AD), backs off when
 throttled, and stops on anything that is not a capacity failure rather than burying it.
 
-It writes `kubeconfig` into the repo root (gitignored), prints the Argo CD password, and
-holds four port-forwards open until you press Ctrl-C. Until rung 2 gives you real
-hostnames, this is how you reach anything.
+`connect.sh` writes `kubeconfig` into the repo root (gitignored), prints the Argo CD and
+Grafana passwords, and holds four port-forwards open until you press Ctrl-C. Until rung 2
+gives you real hostnames, this is how you reach anything.
 
 ## For CI
 

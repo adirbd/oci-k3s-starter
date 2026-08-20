@@ -20,17 +20,31 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# OpenTofu or Terraform — both are supported. Set $env:TF = 'terraform' to force it.
+$TF = if ($env:TF) { $env:TF }
+      elseif (Get-Command tofu -ErrorAction SilentlyContinue) { 'tofu' }
+      else { 'terraform' }
+
 if (-not $IP) {
     Push-Location (Join-Path (Split-Path $PSScriptRoot -Parent) 'terraform')
-    $IP = (tofu output -raw public_ip)
+    $IP = (& $TF output -raw public_ip)
     Pop-Location
 }
 
-if (-not (Test-Path $KubeconfigPath)) {
+# Length check, not just existence: an earlier failed fetch (k3s not up yet) must not
+# leave an empty file behind that every later run trusts. Only write on a good fetch.
+if (-not (Test-Path $KubeconfigPath) -or (Get-Item $KubeconfigPath).Length -eq 0) {
     Write-Host "fetching kubeconfig from $IP"
     # No rewriting: 127.0.0.1 is correct, because everything goes through the tunnel below.
-    ssh "$SshUser@$IP" 'sudo cat /etc/rancher/k3s/k3s.yaml' |
-        Set-Content -Path $KubeconfigPath -Encoding utf8
+    $kc = ssh "$SshUser@$IP" 'sudo cat /etc/rancher/k3s/k3s.yaml'
+    if ($LASTEXITCODE -ne 0 -or -not $kc) {
+        Write-Host ""
+        Write-Host "could not fetch the kubeconfig - k3s is probably still installing."
+        Write-Host "  watch it:   ssh $SshUser@$IP 'sudo journalctl -u k3s-starter-bootstrap -f'"
+        Write-Host "  then re-run this script."
+        exit 1
+    }
+    Set-Content -Path $KubeconfigPath -Value $kc -Encoding utf8
 }
 $env:KUBECONFIG = $KubeconfigPath
 
@@ -78,7 +92,7 @@ try {
     if ($g) {
         Write-Host "Grafana password (user: admin): $([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($g)))"
     } else {
-        Write-Host "Grafana password: run  tofu output -raw grafana_admin_password"
+        Write-Host "Grafana password: run  $TF output -raw grafana_admin_password"
     }
     Write-Host ""
 
