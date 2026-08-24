@@ -123,7 +123,30 @@ upgraded box — the file it applies was written, empty, at first boot and never
 ## Using it
 
 Put a secret in the vault (console → Identity & Security → Vault → Secrets, or the CLI),
-then reference it **by name**:
+then reference it **by name**. Console is the shortest path: create the secret, choose
+**Plain text**, paste the value, save. The CLI equivalent needs the compartment, vault and
+key OCIDs, a base64 value, and — because this repo authenticates with a **session**
+profile — the `--auth security_token` flag:
+
+```bash
+# The OCI CLI uses API-key auth by default and silently ignores the session token
+# (security_token_file) unless you ask for it. Without --auth security_token every call
+# 401s with NotAuthenticated even though the session is valid.
+#   vault_ocid = tofu output -raw vault_ocid
+#   key_ocid   = your vault's key (OCI console > Vault > <vault> > keys)
+
+printf '%s' 'plain-secret-value' | base64
+oci vault secret create-base64 \
+  --compartment-id <compartment_ocid> \
+  --vault-id <vault_ocid> \
+  --key-id <key_ocid> \
+  --secret-name my-app-db-password \
+  --secret-content-content <base64-value> \
+  --auth security_token
+```
+
+The value the CLI stores is the base64 of your secret; the ExternalSecret reads it back
+decoded, so write the same *plain* value you would paste in the console.
 
 ```yaml
 apiVersion: external-secrets.io/v1

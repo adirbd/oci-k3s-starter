@@ -59,6 +59,24 @@ oci_config_profile = "the-name-you-typed"
 Check which profiles exist with `cat ~/.oci/config | grep '^\['`. The error you get for a
 wrong profile does not mention profiles.
 
+**A third, quieter cause: an incomplete session profile.** This repo authenticates with
+`oci session authenticate`, which writes a session profile (`security_token_file` +
+`key_file` + `tenancy` + `region` + `fingerprint`) to `~/.oci/config`. Two things fail
+without touching the session's validity:
+
+- **Missing `user` key.** The `oci` CLI rejects the whole config up front:
+  ```
+  ERROR: The config file at ~\.oci\config is invalid:
+  | user | missing | log into the console and go to the user's settings page to find their OCID |
+  ```
+  Fix: add `user = <your user OCID>` (Profile > your username > OCID) under the profile.
+- **`--auth security_token` required.** The CLI defaults to API-key auth and *silently
+  ignores* `security_token_file`. Every `oci` command against a session profile 401s with
+  `NotAuthenticated` unless you pass `--auth security_token`. The OpenTofu provider passes
+  the token itself, so `tofu` works while `oci` fails — that mismatch is the clue. (You can
+  confirm with `oci session validate --profile <name>`, but a successful validate does not
+  make other `oci` commands work; they still need the flag.)
+
 ## The box is up but there is no cluster
 
 The bootstrap re-runs every 15 minutes until it succeeds, so first check whether it is
