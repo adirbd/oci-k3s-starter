@@ -1,5 +1,9 @@
 # oci-k3s-starter
 
+[![validate](https://github.com/adirbd/oci-k3s-starter/actions/workflows/validate.yaml/badge.svg)](https://github.com/adirbd/oci-k3s-starter/actions/workflows/validate.yaml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Platforms](https://img.shields.io/badge/works%20on-macOS%20·%20Linux%20·%20Windows-informational)
+
 **A free ARM server running your container, with deploys and monitoring already wired.**
 
 Oracle Cloud's Always Free tier includes an Arm server. This repo is sized for **2 cores and
@@ -17,10 +21,17 @@ cd oci-k3s-starter
 oci session authenticate          # browser login, no keys on disk
 cd terraform
 cp terraform.tfvars.example terraform.tfvars   # fill in 3 values
-tofu init && tofu apply
+tofu init
+../scripts/preflight.sh           # 10 seconds; catches what otherwise fails 20 minutes in
+tofu apply
 
 cd .. && ./scripts/connect.sh     # opens every dashboard  (connect.ps1 on Windows)
 ```
+
+> **Expect `Out of host capacity` on the first apply.** Free ARM capacity is scarce; it is
+> not your configuration, and it is the single most common thing that goes wrong. There is
+> a script that retries it properly — rotating availability *and* fault domains, backing
+> off when throttled — until Oracle says yes: `./scripts/retry-apply.sh`.
 
 **Works on macOS, Linux and Windows.** Every command that differs between them is given in
 both forms; Windows needs PowerShell, not WSL, though WSL is fine if you have it.
@@ -72,6 +83,19 @@ flowchart LR
 
 That last arrow is the useful part: Argo puts things back. There is no deploy command to
 run and no server to log into.
+
+## Why this, and not a homelab template
+
+The great cluster templates ([onedr0p](https://github.com/onedr0p/cluster-template),
+[khuedoan](https://github.com/khuedoan/homelab)) assume hardware you own and a stack you
+want to master. This sits at the other end of the ladder:
+
+- **Hardware: none.** The server is Oracle's and the bill is zero — enforced by variable
+  caps and an optional zero-spend budget alert, not by good intentions.
+- **Knowledge: a Dockerfile and `git push`.** Kubernetes is the engine here, not the
+  syllabus.
+- **Scope: four rungs, each complete on its own.** It ends roughly where the big templates
+  begin — and by then you will know whether you want to climb into one.
 
 ---
 
@@ -187,6 +211,10 @@ Allowances vary by account and change over time, so check yours rather than trus
 guide, including this one: **Governance → Limits, Quotas and Usage**, filtered to
 `VM.Standard.A1.Flex`.
 
+**Upgraded to Pay As You Go to escape capacity limits?** That swaps "cannot be billed" for
+"bills for the same mistake" — set `budget_alert_email` in `terraform.tfvars` and a
+zero-spend budget mails you the moment anything bills at all.
+
 [docs/cost-and-limits.md](docs/cost-and-limits.md) has the rest — what the stack itself
 consumes, and how much is left for your app. The short answer is that the platform costs
 about a quarter of the machine.
@@ -262,6 +290,11 @@ nothing. See [rung 4](docs/rung-4-secrets.md#removing-it).
 Extracted from a working two-site homelab where this box is the off-site half — it watches
 the house from outside, because a machine cannot observe its own outage. The watching parts
 are not in here; what is left is the useful skeleton underneath them.
+
+Issues and PRs are welcome, and they work: several of the best fixes in here — the
+tunnel-only kubeconfig, the OCI CLI session gotchas, an Argo sync wedge — arrived as
+issues from the repo's first users. If something ate your evening, [say
+so](https://github.com/adirbd/oci-k3s-starter/issues); the fix usually lands the same week.
 
 ## Licence
 
