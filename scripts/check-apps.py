@@ -134,7 +134,36 @@ def main() -> int:
         name = app["metadata"]["name"]
 
         if not chart:
-            print(f"  skip {name}: not a Helm source")
+            # A directory source: Argo parses EVERY file in the path as a manifest. One
+            # stray non-manifest (a raw dashboard.json, say) has no `kind`, comparison
+            # fails with ComparisonError, and the app wedges at Sync=Unknown forever —
+            # while Health stays green because the live objects already exist (#44).
+            src_path = src.get("path", "")
+            files = sorted(glob.glob(f"{src_path}/*"))
+            if not files:
+                print(f"  skip {name}: directory source {src_path} not in this repo")
+                continue
+            problems = []
+            for f in files:
+                try:
+                    file_docs = list(yaml.safe_load_all(open(f, encoding="utf-8")))
+                except yaml.YAMLError as e:
+                    problems.append(f"{f}: does not parse — Argo refuses the whole app: {e}")
+                    continue
+                for d in file_docs:
+                    if d is not None and (not isinstance(d, dict) or "kind" not in d):
+                        problems.append(
+                            f"{f}: object with no `kind` — one stray non-manifest file "
+                            "wedges the app at Sync=Unknown (#44)"
+                        )
+            if problems:
+                failures += 1
+                print(f"  FAIL {name} (directory source {src_path})")
+                for p in problems:
+                    print(f"        {p}")
+            else:
+                print(f"  OK   {name} (directory source {src_path}) — "
+                      f"{len(files)} file(s), all manifests")
             continue
 
         values = src.get("helm", {}).get("values", "")
