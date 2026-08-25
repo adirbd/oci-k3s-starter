@@ -164,7 +164,8 @@ Things worth knowing:
   anything wrong.
 
 **There is a script for this** — it retries on a sensible interval and rotates availability
-domains, which is what actually changes the answer:
+*and* fault domains, which is what actually changes the answer (in a single-AD region,
+the fault domain is the only thing a retry *can* vary):
 
 ```bash
 ../scripts/retry-apply.sh           # or retry-apply.ps1 on Windows

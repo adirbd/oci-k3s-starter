@@ -35,6 +35,10 @@ resource "oci_core_instance" "main" {
   display_name   = var.instance_name
   shape          = "VM.Standard.A1.Flex"
 
+  # Empty means "Oracle picks" — the right first ask. retry-apply then rotates through
+  # the three FDs, which matters most in 1-AD regions (see the fault_domain variable).
+  fault_domain = var.fault_domain != "" ? var.fault_domain : null
+
   # ⚠ EXPECT "Out of host capacity" ON YOUR FIRST TRY. This is the single most common
   # thing that goes wrong, it is not your configuration, and it is not permanent.
   #

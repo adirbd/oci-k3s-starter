@@ -13,11 +13,13 @@
 # Everything except the instance is created on the first apply and stays in state, so each
 # attempt here is a single LaunchInstance call.
 #
-# ── IT ROTATES AVAILABILITY DOMAINS, WHICH IS THE POINT ──────────────────────────────
-# Capacity is tracked PER availability domain. Retrying the same AD is asking the same
-# full rack over and over; asking AD-2 is a genuinely different question. Each attempt
-# advances availability_domain_index, which wraps, so this works in 1-AD and 3-AD regions
-# alike.
+# ── IT ROTATES AVAILABILITY *AND* FAULT DOMAINS, WHICH IS THE POINT ──────────────────
+# Capacity is tracked per availability domain AND per fault domain. Retrying the same
+# spot is asking the same full rack over and over; asking somewhere else is a genuinely
+# different question. Each attempt cycles the fault domain (starting with "let Oracle
+# pick", the best first ask), and every full cycle advances the AD index. In a 1-AD
+# region — many home regions — the AD index wraps to the same AD every time, and the
+# fault domain is the ONLY axis a retry can actually vary.
 #
 # ── ON RATE LIMITING ─────────────────────────────────────────────────────────────────
 # Oracle throttles LaunchInstance deliberately, to discourage exactly this kind of polling,
@@ -47,15 +49,20 @@ cd "$(dirname "$0")/../terraform" || exit 1
 
 attempt=0
 throttle_backoff="$INTERVAL"
+# API names, NOT the console's "FD-1" labels — those return 400-InvalidParameter.
+# The empty first entry means "let Oracle choose", which is the best first ask.
+FAULT_DOMAINS=("" FAULT-DOMAIN-1 FAULT-DOMAIN-2 FAULT-DOMAIN-3)
 
 while :; do
+    idx=$attempt
     attempt=$((attempt + 1))
-    ad=$(( (attempt - 1) % 3 ))     # wraps in terraform too, so 3 is a safe stride
+    fd="${FAULT_DOMAINS[$((idx % 4))]}"
+    ad=$(( (idx / 4) % 3 ))         # a full FD cycle per AD; both wrap, so any region works
 
-    echo "── attempt $attempt (availability domain index $ad) — $(date '+%H:%M:%S')"
+    echo "── attempt $attempt (AD index $ad, fault domain ${fd:-oracle-picks}) — $(date '+%H:%M:%S')"
 
     out=$("$TF" apply -auto-approve -input=false \
-            -var "availability_domain_index=$ad" "$@" 2>&1)
+            -var "availability_domain_index=$ad" -var "fault_domain=$fd" "$@" 2>&1)
     rc=$?
 
     if [ "$rc" -eq 0 ]; then
@@ -70,7 +77,7 @@ while :; do
     # InternalError whose message merely reads "Out of host capacity". Matching only the
     # tidy one would abort on a failure that is entirely retryable.
     if echo "$out" | grep -qiE "out of host capacity|OutOfHostCapacity"; then
-        echo "   no capacity in that AD — retrying in ${INTERVAL}s"
+        echo "   no capacity there — retrying in ${INTERVAL}s"
         throttle_backoff="$INTERVAL"
         sleep "$INTERVAL"
     elif echo "$out" | grep -qiE "429|TooManyRequests|rate limit"; then
@@ -83,7 +90,8 @@ while :; do
         # Retrying would bury it.
         echo
         echo "❌ this is not a capacity failure — stopping so you can read it:"
-        echo "$out" | tail -30
+        # The Error block, not the last 30 lines of a plan — the signal, not the scroll.
+        echo "$out" | grep -A5 -iE '^│ Error:|Error:' || echo "$out" | tail -30
         exit "$rc"
     fi
 
