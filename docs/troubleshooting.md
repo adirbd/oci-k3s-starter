@@ -77,6 +77,15 @@ without touching the session's validity:
   confirm with `oci session validate --profile <name>`, but a successful validate does not
   make other `oci` commands work; they still need the flag.)
 
+  Rather than repeating the flag on every command, set it once per shell:
+
+  ```bash
+  export OCI_CLI_AUTH=security_token          # macOS, Linux, WSL
+  ```
+  ```powershell
+  $env:OCI_CLI_AUTH = 'security_token'        # Windows
+  ```
+
 ## The box is up but there is no cluster
 
 The bootstrap re-runs every 15 minutes until it succeeds, so first check whether it is
