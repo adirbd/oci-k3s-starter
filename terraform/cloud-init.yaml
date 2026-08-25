@@ -112,13 +112,28 @@ write_files:
       # ── k3s ────────────────────────────────────────────────────────────────────────
       if ! command -v k3s >/dev/null 2>&1; then
         log "installing k3s (${k3s_channel})"
-        curl -sfL https://get.k3s.io \
-          | INSTALL_K3S_CHANNEL="${k3s_channel}" sh -s - \
-              --write-kubeconfig-mode 0600 \
-              --disable traefik
+        # A version pin and a channel are DIFFERENT installer variables. A version passed
+        # as INSTALL_K3S_CHANNEL is not a channel — the channel server 404s and, worse,
+        # some failure shapes fall through to "latest", which looks identical to success.
+        # Route by shape, then PROVE the pin took (a lesson a sibling repo paid for).
+        case "${k3s_channel}" in
+          v*) curl -sfL https://get.k3s.io \
+                | INSTALL_K3S_VERSION="${k3s_channel}" sh -s - \
+                    --write-kubeconfig-mode 0600 \
+                    --disable traefik ;;
+          *)  curl -sfL https://get.k3s.io \
+                | INSTALL_K3S_CHANNEL="${k3s_channel}" sh -s - \
+                    --write-kubeconfig-mode 0600 \
+                    --disable traefik ;;
+        esac
         # traefik is disabled deliberately. At rung 1 you reach services with
         # port-forward; at rung 2 the Cloudflare Tunnel terminates traffic itself. An
         # ingress controller you are not using is memory you cannot spend on your app.
+        case "${k3s_channel}" in
+          v*) k3s --version | grep -qF "${k3s_channel}" \
+                && log "k3s pin took: ${k3s_channel}" \
+                || log "WARNING: k3s reports $(k3s --version | head -1) — NOT the pinned ${k3s_channel}; a rebuild from this config would drift" ;;
+        esac
       else
         log "k3s already present"
       fi
@@ -152,6 +167,12 @@ write_files:
         # manager re-applying its own objects does not conflict with itself.)
         kubectl -n argocd apply --server-side -f \
           "https://raw.githubusercontent.com/argoproj/argo-cd/${argocd_version}/manifests/install.yaml"
+        # Prove the pin took — the URL above 404-redirects on a bad ref in ways that can
+        # leave a previous install looking current.
+        kubectl -n argocd get deployment argocd-server \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -qF "${argocd_version}" \
+          && log "argo cd pin took: ${argocd_version}" \
+          || log "WARNING: argocd-server image does not carry ${argocd_version} — check the manifest ref"
       else
         log "argocd namespace already present"
       fi

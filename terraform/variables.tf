@@ -207,9 +207,16 @@ variable "ssh_allowed_cidr" {
 # ══════════════════════════════════════════════════════════════════════════════════
 
 variable "k3s_channel" {
-  description = "k3s release channel — 'stable' or a pinned version like 'v1.31.4+k3s1'. A channel drifts on rebuild; pin it once you care about reproducibility."
+  description = "k3s to install at first boot: a pinned version like 'v1.36.3+k3s1' (the default — a rebuild six months from now produces the same cluster, the same reasoning as argocd_version) or a channel like 'stable' (drifts on rebuild). The bootstrap routes each shape to the right installer variable — they are NOT interchangeable: a version passed as a channel 404s at the channel server."
   type        = string
-  default     = "stable"
+  # renovate: datasource=github-releases depName=k3s-io/k3s
+  default = "v1.36.3+k3s1"
+}
+
+variable "fault_domain" {
+  description = "Fault domain to request, e.g. 'FAULT-DOMAIN-2' — the API names; the console's 'FD-1' labels are rejected with 400-InvalidParameter. Empty (default) lets Oracle choose. retry-apply rotates this: in a SINGLE-availability-domain region (many home regions), rotating the AD index wraps to the same AD every time, and the fault domain is the only axis left on which a retry is a genuinely different question."
+  type        = string
+  default     = ""
 }
 
 variable "argocd_version" {

@@ -27,14 +27,21 @@ Push-Location (Join-Path (Split-Path $PSScriptRoot -Parent) 'terraform')
 try {
     $attempt = 0
     $throttleBackoff = $Interval
+    # API names, NOT the console's "FD-1" labels. Empty first entry = "let Oracle choose"
+    # — the best first ask. A full FD cycle per AD index; both wrap, so any region works
+    # (in a 1-AD region the fault domain is the only axis a retry can actually vary).
+    $faultDomains = @('', 'FAULT-DOMAIN-1', 'FAULT-DOMAIN-2', 'FAULT-DOMAIN-3')
 
     while ($true) {
+        $idx = $attempt
         $attempt++
-        $ad = ($attempt - 1) % 3
+        $fd = $faultDomains[$idx % 4]
+        $ad = [Math]::Floor($idx / 4) % 3
+        $fdLabel = if ($fd) { $fd } else { "oracle's choice" }
 
-        Write-Host "-- attempt $attempt (availability domain index $ad) -- $(Get-Date -Format HH:mm:ss)"
+        Write-Host "-- attempt $attempt (AD index $ad, fault domain $fdLabel) -- $(Get-Date -Format HH:mm:ss)"
 
-        $out = & $Tf apply -auto-approve -input=false -var "availability_domain_index=$ad" @ExtraArgs 2>&1 | Out-String
+        $out = & $Tf apply -auto-approve -input=false -var "availability_domain_index=$ad" -var "fault_domain=$fd" @ExtraArgs 2>&1 | Out-String
         if ($LASTEXITCODE -eq 0) {
             Write-Host ""
             Write-Host "instance created on attempt $attempt."
@@ -43,7 +50,7 @@ try {
         }
 
         if ($out -imatch 'out of host capacity|OutOfHostCapacity') {
-            Write-Host "   no capacity in that AD - retrying in $Interval s"
+            Write-Host "   no capacity there - retrying in $Interval s"
             $throttleBackoff = $Interval
             Start-Sleep -Seconds $Interval
         }
