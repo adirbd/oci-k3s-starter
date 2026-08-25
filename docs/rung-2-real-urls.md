@@ -116,7 +116,6 @@ flowchart LR
         CFD["cloudflared pod"] --> S["Service<br/>Grafana, Argo, Homepage"]
     end
     CFD -- "dials OUT" --> CF
-    style BOX fill:#f6f8fa,stroke:#2ea043
 ```
 
 The connector dials **out** and holds the connection open. Requests arrive at Cloudflare

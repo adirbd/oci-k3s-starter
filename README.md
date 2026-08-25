@@ -42,7 +42,7 @@ both forms; Windows needs PowerShell, not WSL, though WSL is fine if you have it
 
 ```mermaid
 flowchart LR
-    You["you<br/>laptop"] -- "git push" --> GH["GitHub<br/>your repo"]
+    You["your<br/>laptop"] -- "git push" --> GH["your repo<br/>on GitHub"]
     You -- "tofu apply<br/>once" --> OCI
 
     subgraph OCI["Oracle Cloud · free ARM box"]
@@ -54,11 +54,10 @@ flowchart LR
     end
 
     GH -- "Argo watches" --> Argo
-
-    style OCI fill:#f6f8fa,stroke:#3987e5
-    style You fill:#fff,stroke:#888
-    style GH fill:#fff,stroke:#888
 ```
+
+<!-- No hardcoded colors on purpose: GitHub renders mermaid in the viewer's theme, and a
+     fixed light fill makes the subgraph title unreadable in dark mode. -->
 
 | | |
 |---|---|
