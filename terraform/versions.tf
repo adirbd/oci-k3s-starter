@@ -39,7 +39,7 @@ terraform {
       # Pinned to the 8.x minor. The OCI provider ships constantly — a floating major
       # would break you eventually, and it would break you on a day you were doing
       # something else.
-      version = "~> 8.27"
+      version = "~> 9.0"
     }
     random = {
       source  = "hashicorp/random"
