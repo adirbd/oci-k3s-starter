@@ -37,7 +37,7 @@ spec:
                 image:
                   repository: docker.io/cloudflare/cloudflared
                   # renovate: datasource=docker depName=docker.io/cloudflare/cloudflared
-                  tag: 2026.8.2
+                  tag: 2026.8.3
                 args:
                   - tunnel
                   - --no-autoupdate
