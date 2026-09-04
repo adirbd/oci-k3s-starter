@@ -36,9 +36,10 @@ terraform {
   required_providers {
     oci = {
       source = "oracle/oci"
-      # Pinned to the 8.x minor. The OCI provider ships constantly — a floating major
+      # Pinned to the 9.x minor. The OCI provider ships constantly — a floating major
       # would break you eventually, and it would break you on a day you were doing
-      # something else.
+      # something else. Moving the pin is therefore a deliberate step, not a drift:
+      # 9.0.0's only removal is distributed_database, which this repo does not use.
       version = "~> 9.0"
     }
     random = {
