@@ -168,6 +168,32 @@ instance principal — so there is no API key on the server to steal or rotate.
   [rung 2](docs/rung-2-real-urls.md) for why it is worth ten dollars.
 - **Tailscale** — a private path to the box that survives you breaking the public one.
 - **healthchecks.io** / **ntfy** — free, for "tell me when it dies" and "tell my phone".
+- **k9s** — a terminal dashboard for the cluster (see [below](#track-it-with-k9s)).
+
+## Track it with k9s
+
+[k9s](https://k9scli.io) is the terminal way to watch the cluster — pods, deployments,
+events and logs — without typing `kubectl`. It reads the same `kubeconfig` that kubectl
+does, so it works through the same SSH tunnel, and `scripts/k9s.ps1` (or `k9s.sh`) sets it
+all up in one command:
+
+```powershell
+..\scripts\k9s.ps1     # Windows PowerShell
+```
+```bash
+./scripts/k9s.sh       # macOS, Linux, WSL, Git Bash
+```
+
+Quit k9s and the tunnel closes with it. Where the Argo CD UI answers "what is my deploy
+doing" (the Git-vs-live diff), k9s answers "why is this pod unhappy" — the useful keys:
+
+- `0` — all namespaces; `:ns` — pick a namespace
+- `:deploy` / `:pods` / `:events` — switch view
+- `d` — describe, `l` — tail logs, `s` — shell into the container
+- `?` — everything else
+
+Install: `winget install derailed.k9s` (Windows), `brew install derailed/k9s/k9s` (macOS),
+or a binary from the [releases](https://github.com/derailed/k9s/releases).
 
 ## Login: a browser, not a key file
 
