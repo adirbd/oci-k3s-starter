@@ -9,6 +9,7 @@ Two kinds of thing live here. **Only the first is for you.**
 | `preflight.sh` / `.ps1` | check tools, tfvars, OCI session and Cloudflare Access before applying |
 | `retry-apply.sh` / `.ps1` | keep asking Oracle for the instance until capacity frees up |
 | `connect.sh` / `.ps1` | fetch the kubeconfig and open every UI at once |
+| `k9s.sh` / `.ps1` | open the SSH tunnel and launch k9s — one command to watch the cluster |
 | `set-gitops-repo.sh` | point Argo CD at a different repo — the root app on the running box, and the child Applications in this checkout |
 | `enable-remote-state.sh` | move Terraform state off your laptop into your own OCI bucket |
 
@@ -25,6 +26,10 @@ throttled, and stops on anything that is not a capacity failure rather than bury
 `connect.sh` writes `kubeconfig` into the repo root (gitignored), prints the Argo CD and
 Grafana passwords, and holds four port-forwards open until you press Ctrl-C. Until rung 2
 gives you real hostnames, this is how you reach anything.
+
+`k9s.sh` does the same kubeconfig fetch and SSH tunnel, but skips the port-forwards and
+launches [k9s](https://k9scli.io) instead — the terminal dashboard for watching pods,
+deployments, events and logs during a deploy. Quit k9s and the tunnel closes with it.
 
 ## For CI
 
