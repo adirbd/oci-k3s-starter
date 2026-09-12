@@ -63,15 +63,23 @@ try {
         -ArgumentList '-N', '-L', '6443:127.0.0.1:6443', "$SshUser@$IP"
 
     # Wait for the tunnel instead of guessing at a sleep.
+    #
+    # ⚠ THE PREFERENCE CHANGE IS THE POINT, NOT TIDINESS. Windows PowerShell 5.1 turns a
+    # native program's stderr into a terminating NativeCommandError while
+    # $ErrorActionPreference is 'Stop' — and `*> $null` redirects the text without stopping
+    # that. kubectl writes "connection refused" to stderr on every attempt before the
+    # tunnel is up, which is exactly the expected case here, so the loop built to wait
+    # patiently could instead abort on its first iteration. Scoped to the loop, and done
+    # this way rather than via cmd.exe so the script still runs under pwsh anywhere.
     $ready = $false
+    $eapOuter = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     foreach ($i in 1..30) {
-        # Windows PowerShell 5.1 turns a native program's stderr into a terminating
-        # NativeCommandError when ErrorActionPreference is Stop. cmd keeps an expected
-        # connection refusal during tunnel startup from aborting this retry loop.
-        cmd.exe /d /c "kubectl get --raw /readyz >nul 2>&1"
+        kubectl get --raw /readyz *> $null
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
         Start-Sleep -Seconds 1
     }
+    $ErrorActionPreference = $eapOuter
 
     if (-not $ready) {
         Write-Host ""
