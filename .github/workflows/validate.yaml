@@ -20,7 +20,7 @@ jobs:
 
       - uses: opentofu/setup-opentofu@v2
         with:
-          tofu_version: "1.10.0"
+          tofu_version: "v1.12.6"
 
       - name: fmt
         run: tofu -chdir=terraform fmt -check -diff
@@ -99,7 +99,7 @@ jobs:
 
       - uses: azure/setup-helm@v5
         with:
-          version: "v4.2.4"
+          version: "v4.3.0"
 
       - run: pip install --quiet pyyaml
 
