@@ -1,0 +1,86 @@
+# Applies Terraform from CI, so a push under terraform/ is the deploy button — the same
+# relationship Argo CD already gives kubernetes/.
+#
+# ⚠ OPT-IN, AND SKIPPED BY DEFAULT. The job runs only when the repository variable
+# TF_APPLY_ENABLED is "true", so a fresh clone and every fork keep applying by hand and CI
+# stays green. Turn it on when you are ready to move the credentials into GitHub.
+#
+# Required repository SECRETS (Settings > Secrets and variables > Actions):
+#   TF_VARS                the full contents of terraform/terraform.tfvars, but with
+#                          oci_auth = "APIKey" plus oci_tenancy_ocid / oci_user_ocid /
+#                          oci_fingerprint / oci_private_key set — CI has no browser for
+#                          `oci session authenticate`.
+#   BACKEND_HCL            the contents of terraform/backend.hcl, only if you use remote
+#                          state (docs/state-and-credentials.md).
+#   AWS_ACCESS_KEY_ID      the state bucket's Customer Secret Key, remote state only.
+#   AWS_SECRET_ACCESS_KEY  ...and its secret.
+#
+# Required repository VARIABLE:
+#   TF_APPLY_ENABLED = true
+#
+# Nothing secret is ever written to a file in the repo: TF_VARS and BACKEND_HCL are
+# materialised only for the run, from the secrets store.
+name: terraform-apply
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-apply.yaml"
+
+permissions:
+  contents: read
+
+# Never interrupt an apply. Two runs racing the same state is how state corrupts, and a
+# cancelled apply can leave resources half-created.
+concurrency:
+  group: terraform-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: apply
+    runs-on: ubuntu-latest
+    if: vars.TF_APPLY_ENABLED == 'true'
+    env:
+      TF_IN_AUTOMATION: "true"
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.10.0"
+
+      # tfvars carries OCIDs and tokens, so it is a secret, not a file in the repo.
+      - name: materialise terraform.tfvars
+        env:
+          TF_VARS: ${{ secrets.TF_VARS }}
+        run: |
+          if [ -z "$TF_VARS" ]; then
+            echo "::error::TF_VARS is not set — see the header of this workflow."
+            exit 1
+          fi
+          printf '%s\n' "$TF_VARS" > terraform/terraform.tfvars
+
+      - name: init
+        env:
+          BACKEND_HCL: ${{ secrets.BACKEND_HCL }}
+        run: |
+          if [ -n "$BACKEND_HCL" ]; then
+            printf '%s\n' "$BACKEND_HCL" > terraform/backend.hcl
+            tofu -chdir=terraform init -input=false -backend-config=backend.hcl
+          else
+            tofu -chdir=terraform init -input=false
+          fi
+
+      # Plan to a file, then apply exactly that plan — so what was reviewed in the log is
+      # what runs, with no window for drift between the two steps.
+      - name: plan
+        run: tofu -chdir=terraform plan -input=false -lock-timeout=5m -out=tfplan
+
+      - name: apply
+        run: tofu -chdir=terraform apply -input=false -lock-timeout=5m tfplan
