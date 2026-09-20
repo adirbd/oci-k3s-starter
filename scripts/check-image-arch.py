@@ -72,20 +72,26 @@ def main() -> int:
         app = yaml.safe_load(open(path, encoding="utf-8"))
         if app.get("kind") != "Application":
             continue
-        src = app["spec"]["source"]
-        chart, repo, ver = src.get("chart"), src["repoURL"], src.get("targetRevision")
-        if not chart:
-            continue
+        name = app["metadata"]["name"]
+        spec = app["spec"]
+        # Single-source apps use `source`; multi-source apps use `sources` (e.g. daftari).
+        # Only helm sources carry images, so directory sources are simply skipped.
+        sources = spec.get("sources") or [spec["source"]]
 
-        alias = f"arch-{chart}"
-        sh("helm", "repo", "add", alias, repo)
-        sh("helm", "repo", "update", alias)
-        with open("/tmp/arch-values.yaml", "w", encoding="utf-8") as fh:
-            fh.write(src.get("helm", {}).get("values", ""))
-        r = sh("helm", "template", app["metadata"]["name"], f"{alias}/{chart}",
-               "--version", ver, "-f", "/tmp/arch-values.yaml", "--include-crds=false")
-        if r.returncode == 0:
-            seen |= images_from(r.stdout)
+        for src in sources:
+            chart, repo, ver = src.get("chart"), src["repoURL"], src.get("targetRevision")
+            if not chart:
+                continue
+
+            alias = f"arch-{chart}"
+            sh("helm", "repo", "add", alias, repo)
+            sh("helm", "repo", "update", alias)
+            with open("/tmp/arch-values.yaml", "w", encoding="utf-8") as fh:
+                fh.write(src.get("helm", {}).get("values", ""))
+            r = sh("helm", "template", name, f"{alias}/{chart}",
+                   "--version", ver, "-f", "/tmp/arch-values.yaml", "--include-crds=false")
+            if r.returncode == 0:
+                seen |= images_from(r.stdout)
 
     for image in sorted(seen):
         ok, detail = has_arm64(image)
