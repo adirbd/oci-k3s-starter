@@ -53,7 +53,7 @@ jobs:
 
       - uses: opentofu/setup-opentofu@v2
         with:
-          tofu_version: "1.10.0"
+          tofu_version: "v1.12.6"
 
       # tfvars carries OCIDs and tokens, so it is a secret, not a file in the repo.
       - name: materialise terraform.tfvars
