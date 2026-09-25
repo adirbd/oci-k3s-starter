@@ -81,3 +81,10 @@ oci_config_profile = "DEFAULT"
 # enable_vault = true
 # tenancy_ocid = "ocid1.tenancy.oc1..aaaa_REPLACE_ME"   # required: dynamic groups and
 #                                                        # policies are tenancy-level
+#
+# Extra vault secrets the apps read through ExternalSecrets. Each name must match the
+# `remoteRef.key` in the app repo's manifest; the values are secrets, so prefer the
+# environment (TF_VAR_app_vault_secrets) over this file:
+# app_vault_secrets = {
+#   "myapp-database-url" = "postgres://user:pass@host/db"
+# }

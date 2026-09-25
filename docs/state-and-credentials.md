@@ -180,6 +180,32 @@ see [rung 1](rung-1-the-box.md#3-log-in-with-a-browser).
 
 ---
 
+## Applying from CI
+
+`terraform-apply.yaml` can apply on every push under `terraform/`, so the edge changes with
+the same `git push` that already deploys Kubernetes through Argo CD. It is **off until you
+opt in** — the job is skipped unless the repository variable `TF_APPLY_ENABLED` is `"true"`,
+so a fresh clone and every fork keep applying by hand and CI stays green.
+
+Turning it on moves two files' worth of credentials into GitHub Actions secrets:
+
+| Secret | What it is |
+|---|---|
+| `TF_VARS` | the contents of `terraform/terraform.tfvars`, with `oci_auth = "APIKey"` and the four `oci_*` values set — CI has no browser for `oci session authenticate` |
+| `BACKEND_HCL` | the contents of `terraform/backend.hcl` (remote state only) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | the state bucket's Customer Secret Key (remote state only) |
+
+Then set `TF_APPLY_ENABLED = true` under Settings > Secrets and variables > Actions >
+Variables. The workflow writes the two files from the secrets for the run only; nothing
+secret is committed.
+
+> **When not to do this.** A workflow that applies on every push also *destroys* on every
+> push that removes a resource. If you would rather review each change, leave the variable
+> unset and keep applying from a laptop. The repo is still the source of truth — the only
+> difference is who runs `tofu apply`.
+
+---
+
 ## Rotating secrets that leaked through state
 
 If `terraform.tfstate` was ever committed, pushed, or stored somewhere you no longer trust,

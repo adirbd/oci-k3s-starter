@@ -331,6 +331,13 @@ variable "tenancy_ocid" {
   }
 }
 
+variable "app_vault_secrets" {
+  description = "Extra OCI Vault secrets to create for the apps in kubernetes/applications, as name => value. Each name must match the ExternalSecret remoteRef.key in the app repo (e.g. kasodds-game-fee-address-mainnet). Values are sensitive — supply them via TF_VAR_app_vault_secrets or a gitignored tfvars. Only used when enable_vault = true."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+}
+
 variable "enable_public_http" {
   description = "Open ports 80 and 443 to the internet, for serving your app WITHOUT Cloudflare. Off by default. You also need an ingress controller — see kubernetes/optional/app-traefik.yaml and docs/without-cloudflare.md."
   type        = bool

@@ -38,15 +38,37 @@ echo "  box:  ${IP:-(none found — updating the local checkout only)}"
 echo
 
 # ── the child Applications, in this checkout ──────────────────────────────────────
-# Only Applications sourcing THIS repo are touched: they have a `path:` into it. Helm
-# chart sources have `chart:` instead, and their repoURL must stay what it is.
+# Only the source that points INTO this repo is rewritten: the one whose `path:` is under
+# kubernetes/. A multi-source Application (its own repo PLUS a manifests path here, e.g.
+# daftari) keeps its own repoURL; a helm chart's repoURL is never touched. A blind
+# `s|repoURL: .*|...|` would clobber all of them.
 echo "── child Applications that source this repo"
 changed=0
 for f in "$REPO_ROOT"/kubernetes/applications/*.yaml "$REPO_ROOT"/kubernetes/optional/*.yaml; do
     [ -f "$f" ] || continue
-    grep -qE '^[[:space:]]*path: kubernetes/' "$f" || continue
-    grep -qF "repoURL: $REPO" "$f" && continue
-    sed -i.bak "s|repoURL: .*|repoURL: $REPO|" "$f" && rm -f "$f.bak"
+    grep -qE '^[[:space:]]*path:[[:space:]]*kubernetes/' "$f" || continue
+    # For each `path: kubernetes/...`, walk back to the repoURL that belongs to the same
+    # source item and replace only that line.
+    awk -v newrepo="$REPO" '
+        { lines[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++)
+                if (lines[i] ~ /^[[:space:]]*path:[[:space:]]*kubernetes\//)
+                    for (j = i - 1; j >= 1; j--)
+                        if (lines[j] ~ /^[[:space:]]*-?[[:space:]]*repoURL:/) { target[j] = 1; break }
+            for (i = 1; i <= NR; i++) {
+                if (target[i]) {
+                    match(lines[i], /^[[:space:]]*(-[[:space:]]+)?/)
+                    print substr(lines[i], 1, RLENGTH) "repoURL: " newrepo
+                } else print lines[i]
+            }
+        }
+    ' "$f" > "$f.tmp"
+    if cmp -s "$f" "$f.tmp"; then
+        rm -f "$f.tmp"
+        continue
+    fi
+    mv "$f.tmp" "$f"
     echo "  updated ${f#"$REPO_ROOT"/}"
     changed=1
 done

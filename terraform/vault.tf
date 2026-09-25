@@ -94,3 +94,28 @@ resource "oci_vault_secret" "grafana_admin" {
     content      = base64encode(random_password.grafana_admin.result)
   }
 }
+
+# ── App secrets ───────────────────────────────────────────────────────────────────
+#
+# The apps in kubernetes/applications read their credentials from the vault through
+# ExternalSecrets, and each vault entry's NAME is the app repo's `remoteRef.key`. The
+# values are secrets, so they never live in this repo — but the mechanism does: put the
+# name => value pairs in `app_vault_secrets` (via TF_VAR_ or a gitignored tfvars) and
+# Terraform creates the entries, so a rebuilt box finds them with no console visit.
+#
+# The names are declassified for `for_each` (a resource instance key cannot be sensitive)
+# while the values stay sensitive, so plan output never prints them.
+resource "oci_vault_secret" "app" {
+  for_each = var.enable_vault ? toset(nonsensitive(keys(var.app_vault_secrets))) : toset([])
+
+  compartment_id = var.compartment_ocid
+  vault_id       = oci_kms_vault.main[0].id
+  key_id         = oci_kms_key.main[0].id
+  secret_name    = each.key
+  description    = "Application secret, created by terraform. Read by External Secrets via instance principal."
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.app_vault_secrets[each.key])
+  }
+}

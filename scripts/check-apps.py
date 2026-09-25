@@ -129,90 +129,96 @@ def main() -> int:
         if app.get("kind") != "Application":
             continue
 
-        src = app["spec"]["source"]
-        chart, repo, ver = src.get("chart"), src["repoURL"], src.get("targetRevision")
         name = app["metadata"]["name"]
+        spec = app["spec"]
+        # Single-source apps use `source`; multi-source apps use `sources`. Both are
+        # valid, and a checker that only knows `source` dies with a KeyError on the first
+        # multi-source app it meets (e.g. daftari), turning a valid repo red.
+        sources = spec.get("sources") or [spec["source"]]
 
-        if not chart:
-            # A directory source: Argo parses EVERY file in the path as a manifest. One
-            # stray non-manifest (a raw dashboard.json, say) has no `kind`, comparison
-            # fails with ComparisonError, and the app wedges at Sync=Unknown forever —
-            # while Health stays green because the live objects already exist (#44).
-            src_path = src.get("path", "")
-            files = sorted(glob.glob(f"{src_path}/*"))
-            if not files:
-                print(f"  skip {name}: directory source {src_path} not in this repo")
-                continue
-            problems = []
-            for f in files:
-                try:
-                    file_docs = list(yaml.safe_load_all(open(f, encoding="utf-8")))
-                except yaml.YAMLError as e:
-                    problems.append(f"{f}: does not parse — Argo refuses the whole app: {e}")
+        for src in sources:
+            chart, repo, ver = src.get("chart"), src["repoURL"], src.get("targetRevision")
+
+            if not chart:
+                # A directory source: Argo parses EVERY file in the path as a manifest. One
+                # stray non-manifest (a raw dashboard.json, say) has no `kind`, comparison
+                # fails with ComparisonError, and the app wedges at Sync=Unknown forever —
+                # while Health stays green because the live objects already exist (#44).
+                src_path = src.get("path", "")
+                files = sorted(glob.glob(f"{src_path}/*"))
+                if not files:
+                    print(f"  skip {name}: directory source {src_path} not in this repo")
                     continue
-                for d in file_docs:
-                    if d is not None and (not isinstance(d, dict) or "kind" not in d):
+                problems = []
+                for f in files:
+                    try:
+                        file_docs = list(yaml.safe_load_all(open(f, encoding="utf-8")))
+                    except yaml.YAMLError as e:
+                        problems.append(f"{f}: does not parse — Argo refuses the whole app: {e}")
+                        continue
+                    for d in file_docs:
+                        if d is not None and (not isinstance(d, dict) or "kind" not in d):
+                            problems.append(
+                                f"{f}: object with no `kind` — one stray non-manifest file "
+                                "wedges the app at Sync=Unknown (#44)"
+                            )
+                if problems:
+                    failures += 1
+                    print(f"  FAIL {name} (directory source {src_path})")
+                    for p in problems:
+                        print(f"        {p}")
+                else:
+                    print(f"  OK   {name} (directory source {src_path}) — "
+                          f"{len(files)} file(s), all manifests")
+                continue
+
+            values = src.get("helm", {}).get("values", "")
+            alias = f"ci-{chart}"
+            sh("helm", "repo", "add", alias, repo)
+            sh("helm", "repo", "update", alias)
+
+            with open("/tmp/ci-values.yaml", "w", encoding="utf-8") as fh:
+                fh.write(values)
+
+            r = sh("helm", "template", name, f"{alias}/{chart}", "--version", ver,
+                   "-f", "/tmp/ci-values.yaml", "--include-crds=false")
+            if r.returncode != 0:
+                print(f"  FAIL {name}: chart did not render\n{r.stderr[-800:]}")
+                failures += 1
+                continue
+
+            docs = [d for d in yaml.safe_load_all(r.stdout) if d]
+            problems = []
+
+            for d in docs:
+                dname = d.get("metadata", {}).get("name", "")
+                if d["kind"] == "Service" and len(dname) > MAX_LABEL:
+                    problems.append(
+                        f"Service name is {len(dname)} chars, over the {MAX_LABEL} DNS-1035 "
+                        f"limit: {dname}"
+                    )
+                # Pod volume names are labels too, and this is the one nobody sees coming:
+                # the chart installs, then pods fail to schedule.
+                pod_spec = (d.get("spec", {}).get("template", {}).get("spec")
+                            or d.get("spec", {}).get("jobTemplate", {}).get("spec", {})
+                            .get("template", {}).get("spec") or {})
+                for vol in pod_spec.get("volumes", []) or []:
+                    if len(vol.get("name", "")) > MAX_LABEL:
                         problems.append(
-                            f"{f}: object with no `kind` — one stray non-manifest file "
-                            "wedges the app at Sync=Unknown (#44)"
+                            f"volume name is {len(vol['name'])} chars, over {MAX_LABEL}: "
+                            f"{d['kind']}/{dname} -> {vol['name']}"
                         )
+            if name in ASSERTIONS:
+                problems += ASSERTIONS[name](docs)
+
             if problems:
                 failures += 1
-                print(f"  FAIL {name} (directory source {src_path})")
+                print(f"  FAIL {name} ({chart} {ver})")
                 for p in problems:
                     print(f"        {p}")
             else:
-                print(f"  OK   {name} (directory source {src_path}) — "
-                      f"{len(files)} file(s), all manifests")
-            continue
-
-        values = src.get("helm", {}).get("values", "")
-        alias = f"ci-{chart}"
-        sh("helm", "repo", "add", alias, repo)
-        sh("helm", "repo", "update", alias)
-
-        with open("/tmp/ci-values.yaml", "w", encoding="utf-8") as fh:
-            fh.write(values)
-
-        r = sh("helm", "template", name, f"{alias}/{chart}", "--version", ver,
-               "-f", "/tmp/ci-values.yaml", "--include-crds=false")
-        if r.returncode != 0:
-            print(f"  FAIL {name}: chart did not render\n{r.stderr[-800:]}")
-            failures += 1
-            continue
-
-        docs = [d for d in yaml.safe_load_all(r.stdout) if d]
-        problems = []
-
-        for d in docs:
-            dname = d.get("metadata", {}).get("name", "")
-            if d["kind"] == "Service" and len(dname) > MAX_LABEL:
-                problems.append(
-                    f"Service name is {len(dname)} chars, over the {MAX_LABEL} DNS-1035 "
-                    f"limit: {dname}"
-                )
-            # Pod volume names are labels too, and this is the one nobody sees coming:
-            # the chart installs, then pods fail to schedule.
-            spec = (d.get("spec", {}).get("template", {}).get("spec")
-                    or d.get("spec", {}).get("jobTemplate", {}).get("spec", {})
-                    .get("template", {}).get("spec") or {})
-            for vol in spec.get("volumes", []) or []:
-                if len(vol.get("name", "")) > MAX_LABEL:
-                    problems.append(
-                        f"volume name is {len(vol['name'])} chars, over {MAX_LABEL}: "
-                        f"{d['kind']}/{dname} -> {vol['name']}"
-                    )
-        if name in ASSERTIONS:
-            problems += ASSERTIONS[name](docs)
-
-        if problems:
-            failures += 1
-            print(f"  FAIL {name} ({chart} {ver})")
-            for p in problems:
-                print(f"        {p}")
-        else:
-            checked = " + assertions" if name in ASSERTIONS else ""
-            print(f"  OK   {name} ({chart} {ver}) — {len(docs)} objects{checked}")
+                checked = " + assertions" if name in ASSERTIONS else ""
+                print(f"  OK   {name} ({chart} {ver}) — {len(docs)} objects{checked}")
 
     print("FAILED" if failures else "OK", f"— {failures} application(s) with problems")
     return 1 if failures else 0

@@ -127,7 +127,12 @@ resource "oci_core_instance" "main" {
   #   tofu apply -replace=oci_core_instance.main
   # and only when you are willing to gamble the capacity.
   lifecycle {
-    ignore_changes = [metadata]
+    # metadata: cloud-init runs once at first boot, so a diff here is never something to
+    # apply by surprise (see above). source_details: the image lookup returns the NEWEST
+    # Ubuntu, so without this every plan after an upstream image release wants to change a
+    # running box's boot image — which OCI does not support updating in place. Changing the
+    # image is a deliberate rebuild, not drift.
+    ignore_changes = [metadata, source_details]
 
     precondition {
       condition     = local.image_id != null
