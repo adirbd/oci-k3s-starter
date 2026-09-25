@@ -223,7 +223,7 @@ variable "argocd_version" {
   description = "Argo CD version to install at first boot. Pinned rather than 'stable' so a rebuild six months from now produces the same cluster."
   type        = string
   # renovate: datasource=github-releases depName=argoproj/argo-cd
-  default = "v3.5.2"
+  default = "v3.5.3"
 }
 
 variable "gitops_repo_url" {
