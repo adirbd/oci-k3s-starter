@@ -20,7 +20,7 @@ jobs:
 
       - uses: opentofu/setup-opentofu@v2
         with:
-          tofu_version: "v1.12.6"
+          tofu_version: "v1.13.1"
 
       - name: fmt
         run: tofu -chdir=terraform fmt -check -diff
