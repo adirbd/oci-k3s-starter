@@ -210,7 +210,7 @@ variable "k3s_channel" {
   description = "k3s to install at first boot: a pinned version like 'v1.36.3+k3s1' (the default — a rebuild six months from now produces the same cluster, the same reasoning as argocd_version) or a channel like 'stable' (drifts on rebuild). The bootstrap routes each shape to the right installer variable — they are NOT interchangeable: a version passed as a channel 404s at the channel server."
   type        = string
   # renovate: datasource=github-releases depName=k3s-io/k3s
-  default = "v1.37.0+k3s1"
+  default = "v1.37.1+k3s1"
 }
 
 variable "fault_domain" {
@@ -223,7 +223,7 @@ variable "argocd_version" {
   description = "Argo CD version to install at first boot. Pinned rather than 'stable' so a rebuild six months from now produces the same cluster."
   type        = string
   # renovate: datasource=github-releases depName=argoproj/argo-cd
-  default = "v3.5.3"
+  default = "v3.5.5"
 }
 
 variable "gitops_repo_url" {
