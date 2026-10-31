@@ -40,24 +40,10 @@ both forms; Windows needs PowerShell, not WSL, though WSL is fine if you have it
 
 ## What you get
 
-```mermaid
-flowchart LR
-    You["your<br/>laptop"] -- "git push" --> GH["your repo<br/>on GitHub"]
-    You -- "tofu apply<br/>once" --> OCI
-
-    subgraph OCI["Oracle Cloud · free ARM box"]
-        direction TB
-        K3S["k3s<br/>Kubernetes, one binary"]
-        Argo["Argo CD"] --> App["your app"]
-        Argo --> Graf["Grafana"]
-        Argo --> Home["Homepage"]
-    end
-
-    GH -- "Argo watches" --> Argo
-```
-
-<!-- No hardcoded colors on purpose: GitHub renders mermaid in the viewer's theme, and a
-     fixed light fill makes the subgraph title unreadable in dark mode. -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/platform-map-dark.png">
+  <img alt="oci-k3s-starter platform map: OpenTofu provisions the OCI box, cloud-init installs k3s and Argo CD, Git drives Argo, and Cloudflare fronts the workloads" src="docs/platform-map-light.png">
+</picture>
 
 | | |
 |---|---|
