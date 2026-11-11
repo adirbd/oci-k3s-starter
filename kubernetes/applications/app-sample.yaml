@@ -21,7 +21,7 @@ spec:
   source:
     repoURL: https://stefanprodan.github.io/podinfo
     chart: podinfo
-    targetRevision: 6.15.0
+    targetRevision: 6.17.0
     helm:
       values: |
         replicaCount: 1
