@@ -40,7 +40,8 @@ spec:
         # It also means you are NOT paying for an OCI load balancer, which is the usual way
         # this gets expensive.
         service:
-          type: LoadBalancer
+          spec:
+            type: LoadBalancer
 
         ports:
           web:
