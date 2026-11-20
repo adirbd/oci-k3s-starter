@@ -157,6 +157,8 @@ spec:
               enabled: false
             proxy:
               enabled: false
+            etcd:
+              enabled: false
 
             # ── components this install does not run ──────────────────────────────
             alertmanager-overview:
